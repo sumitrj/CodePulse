@@ -1,0 +1,12 @@
+Red baseline — 2026-07-02, `uv run --with pytest python -m pytest tests/test_identity.py -v`
+
+ERROR collecting tests/test_identity.py
+ModuleNotFoundError: No module named 'codepulse'
+(raised at tests/test_identity.py:7 — from codepulse.identity import extract_units, fingerprint, resolve)
+
+Expected state: the module does not exist yet. 15 test cases (11 acceptance criteria,
+two parametrized x3) are red via collection error. Phase 3 flips every one green.
+
+Contract: when implementation lands, this file's error disappears and the full suite
+passes with no test modified. Any test change during implementation is a spec change
+and must be reflected in specs/identity/SPEC.md first.

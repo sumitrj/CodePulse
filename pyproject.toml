@@ -1,0 +1,17 @@
+[project]
+name = "codepulse"
+version = "0.1.0"
+description = "A system of record for code as capabilities - units, identity, edges, and a change judge"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+llm = ["anthropic>=0.60", "pydantic>=2"]
+dev = ["pytest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["codepulse"]

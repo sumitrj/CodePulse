@@ -1,0 +1,12 @@
+Red baseline — 2026-07-02, `uv run --with pytest python -m pytest tests/test_relationships.py -v`
+
+ERROR collecting tests/test_relationships.py
+ModuleNotFoundError: No module named 'codepulse'
+(raised at tests/test_relationships.py:7 — from codepulse.relationships import ...)
+
+Expected state: the module does not exist yet. 15 test cases (11 acceptance criteria;
+AC2 x4 import forms, AC8 x2) are red via collection error. Phase 3 flips every one green.
+
+Contract: when implementation lands, the full suite passes with no test modified. Any
+test change during implementation is a spec change and must go through
+specs/relationships/SPEC.md first.
