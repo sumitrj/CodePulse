@@ -19,6 +19,21 @@ re-deriving structure and nothing changes silently.
 | Claude Code hooks (push surface) | `cli.cmd_hook_pre/post` | pre-edit context injection + post-edit MAJOR verification |
 | Companion app (Material 3) | `codepulse.app` + `webapp/` | Silhouette / Explore / Ripple / Changes / Workbench |
 | The Workbench (issue -> workpiece) | `codepulse.workbench` | brief, gate, isolated execute, radius-proved, versioned artifacts, GitHub via `gh` |
+| Configurables (one source of truth) | `codepulse.config` + Settings view | scope/gate/judge/hooks/freshness, load-bearing, owner-tagged |
+
+## Configurables
+
+Every control point lives in `.codepulse/config.json`, read live by the scanner (scope),
+the Workbench (gate + judge), and the hooks (injection). Edit it three ways:
+
+```sh
+python3 pulse.py config                       # view all knobs, grouped by owner
+python3 pulse.py config --set gate.max_radius=15
+# or the Settings view in the companion app (Material 3 switches/sliders/selects/chips)
+```
+
+Knobs marked *display-only* are surfaced but not yet enforced (e.g. granularity, cadence);
+everything else changes behavior the moment it's saved.
 
 ## The Workbench
 

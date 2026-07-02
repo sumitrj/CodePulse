@@ -20,11 +20,12 @@ STORE_DIR = ".codepulse"
 STORE_FILE = "store.json"
 
 
-def scan(root: Path) -> dict[str, str]:
+def scan(root: Path, exclude: set[str] | None = None) -> dict[str, str]:
+    exclude = EXCLUDE_DIRS if exclude is None else exclude
     files: dict[str, str] = {}
     for p in sorted(root.rglob("*.py")):
         rel = p.relative_to(root)
-        if any(part in EXCLUDE_DIRS for part in rel.parts):
+        if any(part in exclude for part in rel.parts):
             continue
         try:
             files[str(rel)] = p.read_text(encoding="utf-8")
@@ -53,7 +54,8 @@ class Store:
 
     @classmethod
     def build(cls, root: Path, previous: "Store | None" = None) -> tuple["Store", IdentityResult]:
-        files = scan(root)
+        from .config import load as load_config
+        files = scan(root, exclude=load_config(root).exclude_dirs())
         parseable: dict[str, str] = {}
         new_units: list[Unit] = []
         for path, src in files.items():

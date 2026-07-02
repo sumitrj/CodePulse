@@ -184,10 +184,28 @@ def serve_app(root: Path, port: int = 7317):
                 elif url.path == "/api/workpieces":
                     from .workbench import load_workpieces
                     self._json({"items": load_workpieces(root)})
+                elif url.path == "/api/config":
+                    from . import config as cfgmod
+                    self._json({"schema": cfgmod.SCHEMA, "values": cfgmod.load(root).to_dict()})
                 else:
                     self._send(b"not found", "text/plain", 404)
             except BrokenPipeError:
                 pass
+            except Exception as exc:
+                self._json({"error": str(exc)})
+
+        def do_POST(self):
+            url = urlparse(self.path)
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or "{}")
+                if url.path == "/api/config":
+                    from . import config as cfgmod
+                    cfgmod.save(root, body)
+                    cache.mtime = 0  # force reload so scope changes take effect
+                    self._json({"ok": True, "values": cfgmod.load(root).to_dict()})
+                else:
+                    self._send(b"not found", "text/plain", 404)
             except Exception as exc:
                 self._json({"error": str(exc)})
 

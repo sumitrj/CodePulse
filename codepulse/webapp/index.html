@@ -104,6 +104,41 @@
   .muted { color: var(--outline); }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* settings controls */
+  .setting { padding: 14px 0; border-bottom: 1px solid var(--outline-var); }
+  .setting:last-child { border-bottom: 0; }
+  .setting .top { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  .setting .k { font-weight: 500; }
+  .setting .help { color: var(--on-surface-var); font-size: 12.5px; margin-top: 2px; }
+  .setting .disp { color: var(--outline); font-size: 11px; font-style: italic; }
+  .owner-tag { font-size: 11px; color: var(--on-surface-var); background: var(--surface-c-low);
+    border: 1px solid var(--outline-var); border-radius: 6px; padding: 1px 8px; margin-left: 8px; }
+  /* switch */
+  .switch { position: relative; width: 52px; height: 32px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .track { position: absolute; inset: 0; border-radius: 16px; background: var(--surface-c-highest);
+    border: 2px solid var(--outline); cursor: pointer; transition: .18s; }
+  .thumb { position: absolute; top: 8px; left: 8px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--outline); transition: .18s; }
+  .switch input:checked + .track { background: var(--primary); border-color: var(--primary); }
+  .switch input:checked + .track .thumb { left: 26px; top: 6px; width: 20px; height: 20px; background: var(--on-primary); }
+  /* slider */
+  .slider { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+  .slider input[type=range] { flex: 1; accent-color: var(--primary); height: 4px; }
+  .slider .val { min-width: 34px; text-align: right; font-weight: 500; color: var(--primary); }
+  /* select */
+  select { background: var(--surface-c-high); color: var(--on-surface); border: 1px solid var(--outline);
+    border-radius: 8px; height: 40px; padding: 0 12px; font: inherit; }
+  /* editable chips */
+  .chipbox { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip.rm { cursor: pointer; }
+  .chip.rm:hover { background: var(--error-container); color: var(--error); border-color: transparent; }
+  .chip-add { background: none; border: 1px dashed var(--outline); color: var(--on-surface-var);
+    border-radius: 8px; height: 26px; padding: 0 10px; cursor: pointer; font: inherit; }
+  .savebar { position: sticky; bottom: 0; margin-top: 20px; padding: 14px 0;
+    background: linear-gradient(transparent, var(--surface) 40%); display: flex; gap: 12px; align-items: center; }
+  .toast { color: var(--primary); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -128,6 +163,10 @@
   <button data-view="workbench">
     <span class="pill"><svg viewBox="0 0 24 24"><path d="M22 8h-5V6a3 3 0 0 0-3-3h-4a3 3 0 0 0-3 3v2H2v11h20zM9 6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2H9zm11 11H4v-7h4v2h2v-2h4v2h2v-2h4z"/></svg></span>
     <span class="label">Workbench</span>
+  </button>
+  <button data-view="settings">
+    <span class="pill"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 .1-2l2-1.6-2-3.4-2.4 1a7.3 7.3 0 0 0-1.7-1l-.4-2.6H9l-.4 2.6a7.3 7.3 0 0 0-1.7 1l-2.4-1-2 3.4L2.6 11a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.3 7.3 0 0 0 1.7 1l.4 2.6h6l.4-2.6a7.3 7.3 0 0 0 1.7-1l2.4 1 2-3.4zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg></span>
+    <span class="label">Settings</span>
   </button>
 </nav>
 <main>
@@ -297,8 +336,59 @@ async function renderWorkbench() {
     : '<div class="card"><span class="body-s">No workpieces yet. Run: <code>pulse.py work &lt;issue&gt;</code></span></div>';
 }
 
+/* ---- settings ---- */
+let cfgState = null, cfgSchema = null;
+async function renderSettings() {
+  view.innerHTML = '<div class="spinner">Loading configurables...</div>';
+  const d = await api("/api/config");
+  cfgSchema = d.schema; cfgState = JSON.parse(JSON.stringify(d.values));
+  paintSettings();
+}
+function paintSettings() {
+  const cards = Object.entries(cfgSchema).map(([section, fields]) => {
+    const rows = Object.entries(fields).filter(([k]) => !k.startsWith("_")).map(([key, spec]) =>
+      settingRow(section, key, spec, cfgState[section][key])).join("");
+    return `<div class="card"><h3 class="title">${esc(section)}<span class="owner-tag">${esc(fields._owner)}</span></h3>${rows}</div>`;
+  }).join("");
+  view.innerHTML = `<div class="grid">${cards}</div>
+    <div class="savebar"><button class="btn" onclick="saveSettings()">Save configuration</button>
+      <span class="body-s">Written to <code>.codepulse/config.json</code>; the scanner, gate, judge, and hooks read it live.</span>
+      <span class="toast" id="toast"></span></div>`;
+}
+function settingRow(section, key, spec, value) {
+  const disp = spec.live ? "" : '<span class="disp"> · display-only</span>';
+  let control = "";
+  if (spec.type === "switch") {
+    control = `<label class="switch"><input type="checkbox" ${value ? "checked" : ""}
+      onchange="setCfg('${section}','${key}',this.checked)"><span class="track"><span class="thumb"></span></span></label>`;
+  } else if (spec.type === "slider") {
+    control = `<div class="slider"><input type="range" min="${spec.min}" max="${spec.max}" value="${value}"
+      ${spec.live ? "" : "disabled"} oninput="setCfg('${section}','${key}',+this.value);this.nextElementSibling.textContent=this.value">
+      <span class="val">${value}</span></div>`;
+  } else if (spec.type === "select") {
+    control = `<select ${spec.live ? "" : "disabled"} onchange="setCfg('${section}','${key}',this.value)">
+      ${spec.options.map(o => `<option ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+  }
+  const chips = spec.type === "chips" ? `<div class="chipbox">
+      ${(value || []).map(v => `<span class="chip rm" onclick="rmChip('${section}','${key}','${esc(v)}')">${esc(v)} ✕</span>`).join("")}
+      ${spec.live ? `<button class="chip-add" onclick="addChip('${section}','${key}')">+ add</button>` : ""}</div>` : "";
+  return `<div class="setting"><div class="top"><div><span class="k mono">${esc(key)}</span>${disp}
+      <div class="help">${esc(spec.help)}</div></div>${control}</div>${chips}</div>`;
+}
+function setCfg(s, k, v) { cfgState[s][k] = v; flash("unsaved changes"); }
+function rmChip(s, k, v) { cfgState[s][k] = cfgState[s][k].filter(x => x !== v); paintSettings(); flash("unsaved changes"); }
+function addChip(s, k) { const v = prompt("Add value to " + k); if (v) { cfgState[s][k] = [...cfgState[s][k], v.trim()]; paintSettings(); flash("unsaved changes"); } }
+function flash(msg) { const t = $("#toast"); if (t) t.textContent = msg; }
+async function saveSettings() {
+  flash("saving...");
+  const r = await api2("/api/config", cfgState);
+  if (r.ok) { cfgState = r.values; flash("saved · config is live"); }
+  else flash("error: " + (r.error || "unknown"));
+}
+const api2 = async (path, body) => (await fetch(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})).json();
+
 /* ---- router ---- */
-const renderers = { silhouette: renderSilhouette, explore: renderExplore, ripple: () => renderRipple(), changes: renderChanges, workbench: renderWorkbench };
+const renderers = { silhouette: renderSilhouette, explore: renderExplore, ripple: () => renderRipple(), changes: renderChanges, workbench: renderWorkbench, settings: renderSettings };
 function setView(name) {
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === name));
 }
