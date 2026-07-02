@@ -12,6 +12,21 @@ re-deriving structure and nothing changes silently.
 | Identity fingerprint + 3-tier matcher | `codepulse.identity` | rename, move, refactor, split all survive |
 | Relationship pipeline (6 edge kinds, cross-file resolution) | `codepulse.relationships` | 15/15 tests green |
 | The Judge (refactor/patch/minor/major, Claude-backed) | `codepulse.judge` | mechanical + model + paranoid heuristic |
+| Graph of record (persisted, identity-preserving refresh) | `codepulse.store` | `.codepulse/store.json` per repo |
+| The six verbs (shared by CLI, MCP, hooks) | `codepulse.verbs` | what / who / radius / changed / locate / map |
+| CLI | `codepulse.cli` via `pulse.py` | `index`, all verbs, `install-hooks`, `serve-mcp` |
+| MCP server (stdio JSON-RPC, stdlib only) | `codepulse.mcp_server` | 6 tools: `pulse_what` ... `pulse_map` |
+| Claude Code hooks (push surface) | `cli.cmd_hook_pre/post` | pre-edit context injection + post-edit MAJOR verification |
+
+## Use it on a repo
+
+```sh
+python3 pulse.py --root /path/to/repo index          # build the map
+python3 pulse.py --root /path/to/repo what get_env   # verb 1
+python3 pulse.py --root /path/to/repo radius get_env # verb 3
+python3 pulse.py --root /path/to/repo install-hooks  # Claude Code: map arrives before every edit
+# MCP (project-scoped): add codepulse to the repo's .mcp.json pointing at `pulse.py serve-mcp`
+```
 
 ## Try it
 

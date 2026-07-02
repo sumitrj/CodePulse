@@ -35,7 +35,9 @@ class Verdict:
     source: Literal["mechanical", "model", "heuristic"]
 
 
-def classify_change(old: Unit, new: Unit, model: str = "claude-opus-4-8") -> Verdict:
+def classify_change(
+    old: Unit, new: Unit, model: str = "claude-opus-4-8", use_model: bool = True
+) -> Verdict:
     old_fp, new_fp = fingerprint(old), fingerprint(new)
     if old_fp.body_hash == new_fp.body_hash and old_fp.contract_hash == new_fp.contract_hash:
         detail = (
@@ -44,10 +46,12 @@ def classify_change(old: Unit, new: Unit, model: str = "claude-opus-4-8") -> Ver
             else "unit was renamed or moved intact"
         )
         return Verdict("refactor", f"No semantic change: {detail}.", "mechanical")
-    try:
-        return _model_verdict(old, new, model)
-    except Exception:
-        return _heuristic(old, new, old_fp, new_fp)
+    if use_model:
+        try:
+            return _model_verdict(old, new, model)
+        except Exception:
+            pass
+    return _heuristic(old, new, old_fp, new_fp)
 
 
 def _model_verdict(old: Unit, new: Unit, model: str) -> Verdict:
