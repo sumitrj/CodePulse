@@ -125,6 +125,10 @@
     <span class="pill"><svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.9 3.9L9 12H6a7 7 0 1 1 2 4.9l-1.4 1.4A9 9 0 1 0 13 3zm-1 5v5l4.3 2.5.7-1.2-3.5-2.1V8z"/></svg></span>
     <span class="label">Changes</span>
   </button>
+  <button data-view="workbench">
+    <span class="pill"><svg viewBox="0 0 24 24"><path d="M22 8h-5V6a3 3 0 0 0-3-3h-4a3 3 0 0 0-3 3v2H2v11h20zM9 6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2H9zm11 11H4v-7h4v2h2v-2h4v2h2v-2h4z"/></svg></span>
+    <span class="label">Workbench</span>
+  </button>
 </nav>
 <main>
   <div class="appbar">
@@ -272,8 +276,29 @@ async function renderChanges() {
   </div>`;
 }
 
+/* ---- workbench ---- */
+async function renderWorkbench() {
+  view.innerHTML = '<div class="spinner">Loading workpieces...</div>';
+  const d = await api("/api/workpieces");
+  const statusChip = s => ({delivered:"new", escalated:"minor", rejected:"major", failed:"removed"}[s] || "patch");
+  view.innerHTML = d.items.length ? `<div class="grid">` + d.items.map(w => `
+    <div class="card">
+      <h3 class="title">#${w.issue.number} ${esc(w.issue.title)}
+        <span class="chip ${statusChip(w.status)}">${esc(w.status).toUpperCase()} v${w.version}</span></h3>
+      ${w.gate && !w.gate.eligible ? `<div class="body-s">Gate: ${w.gate.reasons.map(esc).join("; ")}</div>` : ""}
+      ${w.change ? `<div class="label" style="margin-top:8px">CHANGE</div>
+        <div class="body-s mono">${esc(w.change.branch)} — ${w.change.files.map(esc).join(", ")}</div>` : ""}
+      ${w.proof ? `<div class="label" style="margin-top:8px">PROOF</div>
+        <div class="body-s">${w.proof.passed ? "passed" : "FAILED"}: ${w.proof.selected.map(esc).join(", ") || "whole suite"}</div>` : ""}
+      ${(w.verdict || []).map(v => `<div style="margin-top:6px"><span class="chip ${esc(v.classification)}">${esc(v.classification).toUpperCase()}</span>
+        <span class="mono">${esc(v.qualname)}</span><div class="body-s">${esc(v.summary)}</div></div>`).join("")}
+      ${w.rejection ? `<div class="body-s" style="margin-top:8px;color:var(--error)">${esc(w.rejection)}</div>` : ""}
+    </div>`).join("") + `</div>`
+    : '<div class="card"><span class="body-s">No workpieces yet. Run: <code>pulse.py work &lt;issue&gt;</code></span></div>';
+}
+
 /* ---- router ---- */
-const renderers = { silhouette: renderSilhouette, explore: renderExplore, ripple: () => renderRipple(), changes: renderChanges };
+const renderers = { silhouette: renderSilhouette, explore: renderExplore, ripple: () => renderRipple(), changes: renderChanges, workbench: renderWorkbench };
 function setView(name) {
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === name));
 }

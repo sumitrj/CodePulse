@@ -170,6 +170,43 @@ def cmd_app(args):
     serve_app(_root(args), port=args.port)
 
 
+def _issue(args):
+    from .workbench import Issue, fetch_issue
+    if args.file:
+        data = json.loads(Path(args.file).read_text())
+        return Issue(number=data["number"], title=data["title"],
+                     body=data.get("body", ""), labels=tuple(data.get("labels", [])))
+    return fetch_issue(args.number, repo=args.repo)
+
+
+def cmd_brief(args):
+    from .workbench import GateConfig, brief_text, gate, make_brief
+    store, issue = _load(args), _issue(args)
+    brief = make_brief(store, issue)
+    print(brief_text(brief))
+    eligible, reasons = gate(store, brief, GateConfig(max_radius=args.max_radius))
+    print("\nGate:", "ELIGIBLE for hands-free" if eligible
+          else "ESCALATE to human:\n  - " + "\n  - ".join(reasons))
+
+
+def cmd_work(args):
+    from .workbench import GateConfig, claude_executor, run_workpiece, save_workpiece
+    issue = _issue(args)
+    config = GateConfig(max_radius=args.max_radius)
+    wp = run_workpiece(_root(args), issue, config, claude_executor(args.executor),
+                       dry_run=not args.live, use_model=args.llm)
+    path = save_workpiece(_root(args), wp)
+    print(f"Workpiece v{wp['version']} [{wp['status']}] -> {path}")
+    if wp["status"] == "escalated":
+        print("Escalated to human:\n  - " + "\n  - ".join(wp["gate"]["reasons"]))
+    elif wp.get("rejection"):
+        print("Reason:", wp["rejection"])
+    elif wp["status"] == "delivered":
+        from .workbench import render_pr_body
+        print(f"\n{wp['delivery']['pr_title']}  (branch {wp['delivery']['branch']}, {wp['delivery']['mode']})")
+        print(render_pr_body(wp))
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="codepulse")
     parser.add_argument("--root", help="repo root (default: walk up to nearest .codepulse)")
@@ -197,6 +234,17 @@ def main(argv=None) -> int:
     sub.add_parser("serve-mcp", help="MCP server over stdio (six verbs as tools)")
     p = sub.add_parser("app", help="companion app (Material 3 web UI)")
     p.add_argument("--port", type=int, default=7317)
+    for name, help_text in [("brief", "issue -> map-scoped brief + gate decision"),
+                            ("work", "issue -> hands-free workpiece (brief/gate/execute/prove/deliver)")]:
+        p = sub.add_parser(name, help=help_text)
+        p.add_argument("number", nargs="?", type=int)
+        p.add_argument("--file", help="issue JSON file instead of gh")
+        p.add_argument("--repo", help="owner/repo for gh")
+        p.add_argument("--max-radius", type=int, default=10)
+        if name == "work":
+            p.add_argument("--executor", help="executor command template (default: headless claude)")
+            p.add_argument("--live", action="store_true", help="push + PR via gh (default dry-run)")
+            p.add_argument("--llm", action="store_true", help="Claude verdicts in Prove")
 
     args = parser.parse_args(argv)
     command = args.command
@@ -216,4 +264,8 @@ def main(argv=None) -> int:
         cmd_serve(args)
     elif command == "app":
         cmd_app(args)
+    elif command == "brief":
+        cmd_brief(args)
+    elif command == "work":
+        cmd_work(args)
     return 0

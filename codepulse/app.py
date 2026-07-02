@@ -181,6 +181,9 @@ def serve_app(root: Path, port: int = 7317):
                     self._json(radius_data(cache.get(), q.get("name", "")))
                 elif url.path == "/api/changed":
                     self._json(changed_data(cache.get()))
+                elif url.path == "/api/workpieces":
+                    from .workbench import load_workpieces
+                    self._json({"items": load_workpieces(root)})
                 else:
                     self._send(b"not found", "text/plain", 404)
             except BrokenPipeError:

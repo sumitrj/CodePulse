@@ -17,6 +17,21 @@ re-deriving structure and nothing changes silently.
 | CLI | `codepulse.cli` via `pulse.py` | `index`, all verbs, `install-hooks`, `serve-mcp` |
 | MCP server (stdio JSON-RPC, stdlib only) | `codepulse.mcp_server` | 6 tools: `pulse_what` ... `pulse_map` |
 | Claude Code hooks (push surface) | `cli.cmd_hook_pre/post` | pre-edit context injection + post-edit MAJOR verification |
+| Companion app (Material 3) | `codepulse.app` + `webapp/` | Silhouette / Explore / Ripple / Changes / Workbench |
+| The Workbench (issue -> workpiece) | `codepulse.workbench` | brief, gate, isolated execute, radius-proved, versioned artifacts, GitHub via `gh` |
+
+## The Workbench
+
+```sh
+python3 pulse.py brief 123                    # issue -> map-scoped brief + gate decision
+python3 pulse.py work 123                     # hands-free: headless Claude works it, radius-tested, PR-ready
+python3 pulse.py work 123 --live              # push branch, open PR, comment on the issue
+```
+
+Every run produces a versioned **workpiece** (`.codepulse/workpieces/<n>/vN.json`): Brief,
+Change, Proof, Verdict, Trace. The gate escalates to a human when blast radius, fan-in, or
+confidence exceed policy. The promise-test invariant auto-rejects any MAJOR verdict that
+ships without a test change: when a promise moves, a test must move.
 
 ## Use it on a repo
 
