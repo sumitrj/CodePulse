@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodePulse</title>
+<style>
+  :root {
+    --primary: #a8c7fa; --on-primary: #062e6f; --primary-container: #284777;
+    --on-primary-container: #d6e2ff;
+    --secondary-container: #3f4759; --on-secondary-container: #dbe2f9;
+    --tertiary: #ebb8dd; --error: #ffb4ab; --error-container: #93000a;
+    --surface: #101418; --surface-c-low: #191c20; --surface-c: #1d2024;
+    --surface-c-high: #272a2f; --surface-c-highest: #32353a;
+    --on-surface: #e2e2e9; --on-surface-var: #c4c6d0; --outline: #8e9099;
+    --outline-var: #44474e;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--surface); color: var(--on-surface);
+    font: 400 14px/1.5 "Google Sans Text", Roboto, system-ui, sans-serif;
+    display: flex; height: 100vh; overflow: hidden;
+  }
+  /* type scale */
+  .display  { font-size: 45px; line-height: 52px; font-weight: 400; }
+  .headline { font-size: 24px; line-height: 32px; font-weight: 400; }
+  .title    { font-size: 16px; line-height: 24px; font-weight: 500; }
+  .label    { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .5px; }
+  .body-s   { font-size: 12px; color: var(--on-surface-var); }
+  code, .mono { font-family: "Roboto Mono", ui-monospace, monospace; font-size: 12.5px; }
+
+  /* navigation rail */
+  nav {
+    width: 88px; padding: 12px 0; background: var(--surface);
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    border-right: 1px solid var(--outline-var); flex-shrink: 0;
+  }
+  nav .logo { width: 40px; height: 40px; border-radius: 12px; background: var(--primary-container);
+    display: grid; place-items: center; color: var(--on-primary-container); font-weight: 700; margin-bottom: 12px; }
+  nav button {
+    width: 72px; border: 0; background: none; color: var(--on-surface-var);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    cursor: pointer; font: inherit; padding: 0;
+  }
+  nav button .pill { width: 56px; height: 32px; border-radius: 16px; display: grid; place-items: center;
+    transition: background .15s; }
+  nav button:hover .pill { background: var(--surface-c-high); }
+  nav button.active .pill { background: var(--secondary-container); color: var(--on-secondary-container); }
+  nav button.active { color: var(--on-surface); }
+  nav svg { width: 22px; height: 22px; fill: currentColor; }
+
+  main { flex: 1; overflow-y: auto; padding: 24px 28px 64px; }
+  .appbar { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .appbar .root-path { color: var(--on-surface-var); }
+
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .card {
+    background: var(--surface-c); border-radius: 16px; padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+  }
+  .card.filled { background: var(--surface-c-high); }
+  .card h3 { margin-bottom: 10px; }
+  .stat-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat {
+    background: var(--primary-container); color: var(--on-primary-container);
+    border-radius: 16px; padding: 14px 22px; min-width: 130px;
+  }
+  .stat .n { font-size: 32px; font-weight: 500; line-height: 1.2; }
+
+  .bar { height: 8px; border-radius: 4px; background: var(--surface-c-highest); overflow: hidden; margin-top: 3px; }
+  .bar > i { display: block; height: 100%; background: var(--primary); border-radius: 4px; }
+  .rowline { padding: 7px 0; border-bottom: 1px solid var(--outline-var); cursor: pointer; }
+  .rowline:last-child { border-bottom: 0; }
+  .rowline:hover { background: var(--surface-c-high); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 8px; }
+
+  .chip {
+    display: inline-flex; align-items: center; height: 26px; padding: 0 12px;
+    border-radius: 8px; border: 1px solid var(--outline-var); font-size: 12px; font-weight: 500;
+    color: var(--on-surface-var); margin: 2px 4px 2px 0; background: var(--surface-c-low);
+  }
+  .chip.major   { background: var(--error-container); color: var(--error); border-color: transparent; }
+  .chip.removed { background: var(--error-container); color: var(--error); border-color: transparent; }
+  .chip.minor   { background: var(--secondary-container); color: var(--on-secondary-container); border-color: transparent; }
+  .chip.patch, .chip.refactor { color: var(--on-surface-var); }
+  .chip.new     { background: var(--primary-container); color: var(--on-primary-container); border-color: transparent; }
+
+  .field { display: flex; gap: 10px; margin-bottom: 18px; }
+  .field input {
+    flex: 1; max-width: 520px; background: var(--surface-c-high); border: 1px solid var(--outline);
+    border-radius: 28px; height: 48px; padding: 0 22px; color: var(--on-surface); font: inherit; outline: none;
+  }
+  .field input:focus { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .btn {
+    height: 48px; padding: 0 24px; border-radius: 24px; border: 0; cursor: pointer;
+    background: var(--primary); color: var(--on-primary); font: 500 14px/1 inherit;
+  }
+  .btn.tonal { background: var(--secondary-container); color: var(--on-secondary-container); }
+
+  #ripple-svg text { fill: var(--on-surface-var); font-size: 10.5px; font-family: "Roboto Mono", monospace; }
+  #ripple-svg .ring { fill: none; stroke: var(--outline-var); stroke-dasharray: 3 5; }
+  #ripple-svg .node { fill: var(--primary); }
+  #ripple-svg .core { fill: var(--tertiary); }
+  .spinner { color: var(--on-surface-var); padding: 24px 0; }
+  .muted { color: var(--outline); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">CP</div>
+  <button data-view="silhouette" class="active">
+    <span class="pill"><svg viewBox="0 0 24 24"><path d="M3 13h4v8H3zm7-6h4v14h-4zm7-4h4v18h-4z"/></svg></span>
+    <span class="label">Silhouette</span>
+  </button>
+  <button data-view="explore">
+    <span class="pill"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3a6.5 6.5 0 1 0-.7.7l.3.3v.8l5 5 1.5-1.5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg></span>
+    <span class="label">Explore</span>
+  </button>
+  <button data-view="ripple">
+    <span class="pill"><svg viewBox="0 0 24 24"><path d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0-4a6 6 0 0 0-6 6h2a4 4 0 0 1 8 0h2a6 6 0 0 0-6-6zm0-4A10 10 0 0 0 2 12h2a8 8 0 0 1 16 0h2A10 10 0 0 0 12 2z"/></svg></span>
+    <span class="label">Ripple</span>
+  </button>
+  <button data-view="changes">
+    <span class="pill"><svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.9 3.9L9 12H6a7 7 0 1 1 2 4.9l-1.4 1.4A9 9 0 1 0 13 3zm-1 5v5l4.3 2.5.7-1.2-3.5-2.1V8z"/></svg></span>
+    <span class="label">Changes</span>
+  </button>
+</nav>
+<main>
+  <div class="appbar">
+    <span class="headline">CodePulse</span>
+    <span class="root-path mono" id="root-path"></span>
+  </div>
+  <div id="view"></div>
+</main>
+<script>
+const $ = (s, el=document) => el.querySelector(s);
+const view = $("#view");
+let summary = null;
+
+const esc = s => (s ?? "").toString().replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const api = async (path) => (await fetch(path)).json();
+
+/* ---- silhouette ---- */
+async function renderSilhouette() {
+  view.innerHTML = '<div class="spinner">Reading the map...</div>';
+  summary = summary || await api("/api/summary");
+  $("#root-path").textContent = summary.root;
+  const maxRegion = Math.max(...summary.regions.map(r => r.count), 1);
+  const maxFan = Math.max(...summary.load_bearing.map(l => l.fan_in), 1);
+  view.innerHTML = `
+    <div class="stat-row">
+      <div class="stat"><div class="n">${summary.files}</div><div class="label">files</div></div>
+      <div class="stat"><div class="n">${summary.units}</div><div class="label">units</div></div>
+      <div class="stat"><div class="n">${summary.edges}</div><div class="label">edges</div></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h3 class="title">Regions</h3>${summary.regions.map(r => `
+        <div style="padding:6px 0">
+          <div style="display:flex;justify-content:space-between"><span class="mono">${esc(r.name)}</span><span class="body-s">${r.count} units</span></div>
+          <div class="bar"><i style="width:${Math.round(100*r.count/maxRegion)}%"></i></div>
+        </div>`).join("")}
+      </div>
+      <div class="card"><h3 class="title">Load-bearing units <span class="body-s">(highest fan-in — tread carefully)</span></h3>
+        ${summary.load_bearing.map(l => `
+        <div class="rowline" onclick="gotoRipple('${esc(l.qualname)}')">
+          <div style="display:flex;justify-content:space-between"><span class="mono">${esc(l.qualname)}</span><span class="body-s">${l.fan_in} dependents</span></div>
+          <div class="body-s">${esc(l.path)}</div>
+          <div class="bar"><i style="width:${Math.round(100*l.fan_in/maxFan)}%"></i></div>
+        </div>`).join("")}
+      </div>
+      <div class="card"><h3 class="title">Simplicity audit <span class="body-s">(identical implementations)</span></h3>
+        ${summary.duplicates.length ? summary.duplicates.map(g => `
+          <div class="rowline"><span class="chip">${g.length}×</span> ${g.map(u => `<span class="mono">${esc(u.path)}::${esc(u.qualname)}</span>`).join('<span class="muted">  ==  </span>')}</div>
+        `).join("") : '<span class="body-s">No duplicate bodies. Clean.</span>'}
+      </div>
+    </div>`;
+}
+
+/* ---- explore ---- */
+function renderExplore() {
+  view.innerHTML = `
+    <div class="field">
+      <input id="q" placeholder="Where does it live? Describe the behavior..." autofocus>
+      <button class="btn" onclick="doSearch()">Locate</button>
+    </div>
+    <div class="two-col"><div id="results"></div><div id="unit-card"></div></div>`;
+  $("#q").addEventListener("keydown", e => e.key === "Enter" && doSearch());
+}
+async function doSearch() {
+  const q = $("#q").value.trim(); if (!q) return;
+  $("#results").innerHTML = '<div class="spinner">Locating...</div>';
+  const data = await api("/api/search?q=" + encodeURIComponent(q));
+  $("#results").innerHTML = `<div class="card">` + (data.results.length ? data.results.map(r => `
+    <div class="rowline" onclick="openUnit('${esc(r.path)}','${esc(r.qualname)}')">
+      <span class="chip">${r.score}</span> <span class="mono">${esc(r.qualname)}</span>
+      <div class="body-s">${esc(r.path)}${r.doc ? " — " + esc(r.doc) : ""}</div>
+    </div>`).join("") : '<span class="body-s">Nothing matches.</span>') + `</div>`;
+}
+async function openUnit(path, qualname) {
+  $("#unit-card").innerHTML = '<div class="spinner">Loading card...</div>';
+  const u = await api(`/api/unit?path=${encodeURIComponent(path)}&qualname=${encodeURIComponent(qualname)}`);
+  $("#unit-card").innerHTML = `
+    <div class="card filled">
+      <h3 class="title mono">${esc(u.qualname)} <span class="chip">${esc(u.kind)}</span></h3>
+      <div class="body-s" style="margin-bottom:8px">${esc(u.path)}</div>
+      ${u.doc ? `<p style="margin-bottom:10px">${esc(u.doc)}</p>` : ""}
+      <div class="label" style="margin-top:6px">CONTRACT</div>
+      <code>(${u.params.map(esc).join(", ")})${u.returns ? " → " + esc(u.returns) : ""}</code>
+      <div class="label" style="margin-top:12px">CALLS</div>
+      <div>${u.calls.length ? u.calls.map(c => `<span class="chip mono">${esc(c)}</span>`).join("") : '<span class="body-s">nothing</span>'}</div>
+      <div class="label" style="margin-top:12px">DIRECT DEPENDENTS (${u.dependents.length})</div>
+      <div class="body-s mono">${u.dependents.slice(0, 8).map(esc).join("<br>") || "none"}</div>
+      <div style="margin-top:14px"><button class="btn tonal" onclick="gotoRipple('${esc(u.qualname)}')">Blast radius: ${u.radius} unit${u.radius === 1 ? "" : "s"}</button></div>
+    </div>`;
+}
+
+/* ---- ripple ---- */
+function renderRipple(prefill) {
+  view.innerHTML = `
+    <div class="field">
+      <input id="rq" placeholder="Unit or state name — what breaks if I change it?" value="${esc(prefill || "")}">
+      <button class="btn" onclick="doRipple()">Ripple</button>
+    </div>
+    <div id="ripple-out"></div>`;
+  $("#rq").addEventListener("keydown", e => e.key === "Enter" && doRipple());
+  if (prefill) doRipple();
+}
+async function doRipple() {
+  const name = $("#rq").value.trim(); if (!name) return;
+  $("#ripple-out").innerHTML = '<div class="spinner">Computing the ripple...</div>';
+  const d = await api("/api/radius?name=" + encodeURIComponent(name));
+  if (d.error) { $("#ripple-out").innerHTML = `<div class="card">${esc(d.error)}</div>`; return; }
+  const W = 900, H = 620, cx = W / 2, cy = H / 2;
+  let svg = "";
+  d.hops.forEach(h => { svg += `<circle class="ring" cx="${cx}" cy="${cy}" r="${h.depth * 130}"/>`; });
+  d.hops.forEach(h => {
+    const shown = h.units.slice(0, 16);
+    shown.forEach((u, i) => {
+      const a = (2 * Math.PI * i) / shown.length - Math.PI / 2;
+      const x = cx + Math.cos(a) * h.depth * 130, y = cy + Math.sin(a) * h.depth * 130;
+      const anchor = Math.cos(a) >= 0 ? "start" : "end";
+      svg += `<circle class="node" cx="${x}" cy="${y}" r="5"/>
+              <text x="${x + (Math.cos(a) >= 0 ? 9 : -9)}" y="${y + 3}" text-anchor="${anchor}">${esc(u.qualname.slice(0, 34))}</text>`;
+    });
+  });
+  svg += `<circle class="core" cx="${cx}" cy="${cy}" r="10"/>
+          <text x="${cx}" y="${cy - 18}" text-anchor="middle" style="font-weight:700;fill:var(--on-surface)">${esc(d.target)}</text>`;
+  $("#ripple-out").innerHTML = `
+    <div class="card">
+      <h3 class="title">${d.total} unit${d.total === 1 ? "" : "s"} at risk if <span class="mono">${esc(d.target)}</span> changes</h3>
+      <svg id="ripple-svg" viewBox="0 0 ${W} ${H}" style="width:100%;max-height:66vh"></svg>
+      ${d.hops.map(h => `<div style="margin-top:6px"><span class="chip">${h.depth} hop${h.depth > 1 ? "s" : ""}</span>
+        <span class="body-s mono">${h.units.map(u => esc(u.qualname)).join(", ")}</span></div>`).join("")}
+    </div>`;
+  $("#ripple-svg").innerHTML = svg;
+}
+function gotoRipple(name) { setView("ripple"); renderRipple(name); }
+
+/* ---- changes ---- */
+async function renderChanges() {
+  view.innerHTML = '<div class="spinner">Re-reading the working tree and judging every changed unit...</div>';
+  const d = await api("/api/changed");
+  view.innerHTML = `<div class="card">
+    <h3 class="title">What changed since the last index</h3>
+    ${d.items.length ? d.items.map(i => `
+      <div class="rowline">
+        <span class="chip ${esc(i.classification)}">${esc(i.classification).toUpperCase()}</span>
+        <span class="mono">${esc(i.path)} :: ${esc(i.qualname)}</span>
+        <div class="body-s">${esc(i.summary)}</div>
+      </div>`).join("") : '<span class="body-s">Nothing changed. The map is current.</span>'}
+  </div>`;
+}
+
+/* ---- router ---- */
+const renderers = { silhouette: renderSilhouette, explore: renderExplore, ripple: () => renderRipple(), changes: renderChanges };
+function setView(name) {
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === name));
+}
+document.querySelectorAll("nav button").forEach(b =>
+  b.addEventListener("click", () => { setView(b.dataset.view); renderers[b.dataset.view](); }));
+renderSilhouette();
+</script>
+</body>
+</html>

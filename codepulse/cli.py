@@ -165,6 +165,11 @@ def cmd_serve(args):
     serve(_root(args))
 
 
+def cmd_app(args):
+    from .app import serve_app
+    serve_app(_root(args), port=args.port)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="codepulse")
     parser.add_argument("--root", help="repo root (default: walk up to nearest .codepulse)")
@@ -190,6 +195,8 @@ def main(argv=None) -> int:
     hook.add_argument("event", choices=["pre", "post"])
     sub.add_parser("install-hooks", help="write .claude/settings.json hooks for this repo")
     sub.add_parser("serve-mcp", help="MCP server over stdio (six verbs as tools)")
+    p = sub.add_parser("app", help="companion app (Material 3 web UI)")
+    p.add_argument("--port", type=int, default=7317)
 
     args = parser.parse_args(argv)
     command = args.command
@@ -207,4 +214,6 @@ def main(argv=None) -> int:
         cmd_hooks_install(args)
     elif command == "serve-mcp":
         cmd_serve(args)
+    elif command == "app":
+        cmd_app(args)
     return 0
