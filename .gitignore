@@ -3,3 +3,9 @@ __pycache__/
 .venv/
 .pytest_cache/
 dist/
+build/
+*.egg-info/
+.DS_Store
+
+# CodePulse runtime state (generated per-repo by `pulse.py index`)
+.codepulse/
