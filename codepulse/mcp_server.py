@@ -26,6 +26,8 @@ _TOOLS = [
      {"query": "words describing the thing you are looking for"}, ["query"]),
     ("pulse_map", "System silhouette: counts and load-bearing entities.",
      {}, []),
+    ("pulse_handlers", "Board: estimated handler-level functions (uncalled roots with downstream reach).",
+     {}, []),
 ]
 
 
@@ -66,6 +68,9 @@ def dispatch(engine: Engine, name: str, arguments: dict) -> str:
         return six.locate(engine, arguments["query"])
     if name == "pulse_map":
         return six.system_map(engine)
+    if name == "pulse_handlers":
+        from . import boards
+        return boards.handlers_text(engine)
     if name == "pulse_changed":
         raw = arguments.get("paths", "").split()
         paths = [engine.root / p for p in raw] if raw else _git_modified(engine.root)

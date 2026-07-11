@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import six
+from . import boards, six
 from .engine import Engine
 from .recipes import builtin_recipes
 
@@ -29,6 +29,8 @@ def answer(engine: Engine, verb: str, arg: str) -> str:
         return six.locate(engine, arg)
     if verb == "map":
         return six.system_map(engine)
+    if verb == "handlers":
+        return boards.handlers_text(engine)
     if verb == "changed":
         if arg:
             paths = [engine.root / p for p in arg.split()]
@@ -84,6 +86,20 @@ def make_server(engine: Engine, port: int = 7317) -> HTTPServer:
                     engine.refresh()
                     text = answer(engine, query.get("v", [""])[0], query.get("arg", [""])[0])
                     body = json.dumps({"text": text}).encode()
+                elif url.path == "/api/handlers":
+                    engine.refresh()
+                    body = json.dumps(boards.handlers(engine)).encode()
+                elif url.path == "/api/radius":
+                    query = parse_qs(url.query)
+                    engine.refresh()
+                    body = json.dumps(boards.radius_graph(
+                        engine,
+                        query.get("name", [""])[0],
+                        direction=query.get("dir", ["in"])[0],
+                    )).encode()
+                elif url.path == "/api/graph":
+                    engine.refresh()
+                    body = json.dumps(boards.file_graph(engine)).encode()
                 else:
                     self.send_response(404)
                     self.end_headers()

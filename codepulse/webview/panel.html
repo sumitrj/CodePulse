@@ -28,16 +28,16 @@
   header h1 { font-size: 15px; font-weight: 700; letter-spacing: .08em; }
   #stats { margin-left: auto; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--mut); }
 
-  #ask { display: flex; gap: 0; border-bottom: 1.5px solid var(--ink); }
+  #ask { display: flex; border-bottom: 1.5px solid var(--ink); }
   .tabs { display: flex; }
   .tabs button {
     border: 0; border-right: 1px solid var(--soft); background: var(--paper);
-    padding: 8px 14px; font: inherit; font-size: 12px; text-transform: uppercase;
-    letter-spacing: .05em; color: var(--ink); cursor: pointer;
+    padding: 8px 12px; font: inherit; font-size: 12px; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--ink); cursor: pointer; white-space: nowrap;
   }
   .tabs button.active { background: var(--ink); color: var(--paper); }
   #arg {
-    flex: 1; border: 0; border-left: 1.5px solid var(--ink);
+    flex: 1; min-width: 60px; border: 0; border-left: 1.5px solid var(--ink);
     padding: 8px 12px; font: inherit; background: var(--paper); color: var(--ink);
   }
   #arg:focus { outline: none; background: var(--hush); }
@@ -49,7 +49,7 @@
   #run:hover { background: var(--ink); color: var(--paper); }
 
   main { flex: 1; display: flex; min-height: 0; }
-  #rail { width: 280px; border-right: 1.5px solid var(--ink); overflow: auto; }
+  #rail { width: 260px; border-right: 1.5px solid var(--ink); overflow: auto; flex: none; }
   #rail .file { border-bottom: 1px solid var(--soft); }
   #rail summary {
     padding: 6px 10px; cursor: pointer; list-style: none;
@@ -76,6 +76,33 @@
   #out .lnk:hover { background: var(--ink); color: var(--paper); }
   #empty { color: var(--mut); text-align: center; padding: 60px 0; }
 
+  #viz { overflow: auto; }
+  #viz .caption {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--mut); margin-bottom: 8px;
+  }
+  svg { display: block; }
+  svg text { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; fill: var(--ink); }
+  svg text.mut { fill: var(--mut); font-size: 10px; }
+  svg text.col { fill: var(--mut); font-size: 11px; letter-spacing: .05em; }
+  svg text.inv { fill: var(--paper); }
+  svg .node { cursor: pointer; }
+  svg .node rect { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
+  svg .node.target rect { fill: var(--ink); }
+  svg .node:hover rect { fill: var(--ink); }
+  svg .node:hover text { fill: var(--paper); }
+  svg path.edge { fill: none; stroke: #c2c2c2; }
+  svg path.edge.hot { stroke: var(--ink); }
+
+  table { border-collapse: collapse; font-size: 13px; width: 100%; }
+  th { background: var(--hush); font-weight: 600; }
+  th, td { border: 1px solid var(--soft); padding: 5px 8px; text-align: left; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  td.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  td.n { text-align: right; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover td { background: var(--ink); color: var(--paper); }
+
   footer {
     padding: 6px 14px; border-top: 1.5px solid var(--ink);
     font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--mut);
@@ -95,15 +122,16 @@
 
   <div id="ask">
     <nav class="tabs" id="tabs">
-      <button data-v="what" class="active">WHAT</button>
+      <button data-v="what">WHAT</button>
       <button data-v="who">WHO</button>
       <button data-v="radius">BREAKS</button>
       <button data-v="changed">CHANGED</button>
       <button data-v="locate">WHERE</button>
-      <button data-v="map">MAP</button>
+      <button data-v="map" class="active">MAP</button>
+      <button data-v="handlers">HANDLERS</button>
     </nav>
     <input id="arg" placeholder="entity name, path::name, or words to locate" spellcheck="false">
-    <button id="run">Ask</button>
+    <button id="run">ASK</button>
   </div>
 
   <main>
@@ -111,6 +139,7 @@
     <section id="stage">
       <div id="empty">Pick an entity, or ask the map a question.</div>
       <div id="out" hidden></div>
+      <div id="viz" hidden></div>
     </section>
   </main>
 
@@ -118,9 +147,11 @@
 
 <script>
   const $ = (s) => document.querySelector(s);
-  let verb = "what";
+  const SVGNS = "http://www.w3.org/2000/svg";
+  let verb = "map";
 
   const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const api = async (url) => (await fetch(url)).json();
 
   function linkify(t) {
     return t.replace(
@@ -129,22 +160,227 @@
     );
   }
 
-  async function run(v, arg) {
+  function setActive(v) {
     verb = v;
     document.querySelectorAll("#tabs button").forEach(
       (b) => b.classList.toggle("active", b.dataset.v === v)
     );
-    $("#arg").value = arg;
-    const r = await fetch(`/api/verb?v=${encodeURIComponent(v)}&arg=${encodeURIComponent(arg)}`);
-    const data = await r.json();
+  }
+
+  function show(which) {          // "out" | "viz"
     $("#empty").hidden = true;
-    const out = $("#out");
-    out.hidden = false;
-    out.innerHTML = linkify(esc(data.text));
+    $("#out").hidden = which !== "out";
+    $("#viz").hidden = which !== "viz";
+  }
+
+  function svgEl(tag, attrs, parent) {
+    const el = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(el);
+    return el;
+  }
+
+  function edgeDash(kind) {
+    if (kind === "reads") return "5 3";
+    if (kind === "inherits") return "1 3";
+    return "";
+  }
+
+  // ── BREAKS / REACH: the hop diagram ─────────────────────────────────
+  function drawRadius(data) {
+    const viz = $("#viz");
+    viz.innerHTML = "";
+    const out = data.direction === "out";
+    const cap = document.createElement("div");
+    cap.className = "caption";
+    const hops = data.nodes.length ? Math.max(...data.nodes.map(n => n.hop)) : 0;
+    const head = out ? "reach of" : "blast radius of";
+    const what = out ? "reached" : "at risk";
+    cap.textContent = data.nodes.length
+      ? `${head} ${data.target.path} :: ${data.target.name} — ` +
+        `${data.nodes.length} ${what}, ${hops} hop${hops === 1 ? "" : "s"} deep · ` +
+        `solid calls · dashed reads · dotted inherits · click to re-center`
+      : `${head} ${data.target.path} :: ${data.target.name} — ` +
+        (out ? "calls nothing on the map." : "nothing depends on it.");
+    viz.appendChild(cap);
+
+    const byHop = new Map([[0, [{ path: data.target.path, name: data.target.name, hop: 0 }]]]);
+    for (const n of data.nodes) {
+      if (!byHop.has(n.hop)) byHop.set(n.hop, []);
+      byHop.get(n.hop).push(n);
+    }
+    const colW = 280, boxW = 230, boxH = 34, gap = 10, top = 44;
+    const pos = new Map();
+    const rows = Math.max(...[...byHop.values()].map(c => c.length));
+    const svg = svgEl("svg", {
+      width: byHop.size * colW + 40,
+      height: top + rows * (boxH + gap) + 20,
+    });
+
+    const edgeLayer = svgEl("g", {}, svg);
+    for (const [hop, col] of [...byHop.entries()].sort((a, b) => a[0] - b[0])) {
+      const x = 20 + hop * colW;
+      svgEl("text", { x, y: 24, class: "col" }, svg).textContent =
+        hop === 0 ? "TARGET" : `${hop} HOP${hop === 1 ? "" : "S"}`;
+      col.forEach((n, i) => {
+        const y = top + i * (boxH + gap);
+        const g = svgEl("g", { class: "node" + (n.hop === 0 ? " target" : "") }, svg);
+        svgEl("rect", { x, y, width: boxW, height: boxH }, g);
+        const t1 = svgEl("text", { x: x + 8, y: y + 15, class: n.hop === 0 ? "inv" : "" }, g);
+        t1.textContent = n.name.length > 30 ? n.name.slice(0, 29) + "…" : n.name;
+        const t2 = svgEl("text", { x: x + 8, y: y + 28, class: "mut" + (n.hop === 0 ? " inv" : "") }, g);
+        t2.textContent = n.path;
+        g.addEventListener("click", () => {
+          if (n.hop === 0) run("what", `${n.path}::${n.name}`);
+          else runRadius(`${n.path}::${n.name}`, data.direction);
+        });
+        pos.set(`${n.path}::${n.name}`, { x, y, hop: n.hop });
+      });
+    }
+    for (const e of data.edges) {
+      const a = pos.get(e.src), b = pos.get(e.dst);
+      if (!a || !b) continue;
+      // draw left-to-right: from the lower-hop box's right edge to the higher-hop box's left edge
+      const from = a.hop <= b.hop ? a : b, to = a.hop <= b.hop ? b : a;
+      const x1 = from.x + boxW, y1 = from.y + boxH / 2, x2 = to.x, y2 = to.y + boxH / 2;
+      const mid = (x1 + x2) / 2;
+      svgEl("path", {
+        class: "edge", d: `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`,
+        "stroke-dasharray": edgeDash(e.kind), "stroke-width": 1.2,
+      }, edgeLayer);
+    }
+    viz.appendChild(svg);
+  }
+
+  async function runRadius(arg, dir) {
+    setActive("radius");
+    $("#arg").value = arg;
+    const data = await api(
+      `/api/radius?name=${encodeURIComponent(arg)}&dir=${encodeURIComponent(dir || "in")}`);
+    if (!data.target) {
+      $("#out").innerHTML = linkify(esc(`No entity matching '${arg}'.`));
+      show("out");
+      return;
+    }
+    drawRadius(data);
+    show("viz");
+  }
+
+  // ── MAP: the whole repo, layered by dependency depth ────────────────
+  function drawMap(data) {
+    const viz = $("#viz");
+    viz.innerHTML = "";
+    const cap = document.createElement("div");
+    cap.className = "caption";
+    cap.textContent = `the whole map · ${data.nodes.length} ${data.mode === "file" ? "files" : "directories"}` +
+      ` · edges are cross-file references, thicker = more · click a box to inspect`;
+    viz.appendChild(cap);
+
+    const cols = new Map();
+    for (const n of data.nodes) {
+      if (!cols.has(n.depth)) cols.set(n.depth, []);
+      cols.get(n.depth).push(n);
+    }
+    for (const col of cols.values()) col.sort((a, b) => b.entities - a.entities);
+
+    const colW = 250, boxW = 210, boxH = 24, gap = 8, top = 40;
+    const rows = Math.max(...[...cols.values()].map(c => c.length));
+    const svg = svgEl("svg", {
+      width: cols.size * colW + 40,
+      height: top + rows * (boxH + gap) + 20,
+    });
+    const edgeLayer = svgEl("g", {}, svg);
+    const pos = new Map();
+
+    for (const [depth, col] of [...cols.entries()].sort((a, b) => a[0] - b[0])) {
+      const x = 20 + depth * colW;
+      col.forEach((n, i) => {
+        const y = top + i * (boxH + gap);
+        const g = svgEl("g", { class: "node", "data-id": n.id }, svg);
+        svgEl("rect", { x, y, width: boxW, height: boxH }, g);
+        const label = n.id.length > 26 ? "…" + n.id.slice(-25) : n.id;
+        svgEl("text", { x: x + 6, y: y + 16 }, g).textContent = label;
+        const badge = svgEl("text", { x: x + boxW - 6, y: y + 16, class: "mut", "text-anchor": "end" }, g);
+        badge.textContent = String(n.entities);
+        g.addEventListener("mouseenter", () => hot(n.id, true));
+        g.addEventListener("mouseleave", () => hot(n.id, false));
+        if (data.mode === "file") {
+          g.addEventListener("click", () => run("what", `${n.id}::<module>`));
+        }
+        pos.set(n.id, { x, y });
+      });
+    }
+    const hotEdges = new Map();
+    for (const e of data.edges) {
+      const a = pos.get(e.src), b = pos.get(e.dst);
+      if (!a || !b) continue;
+      const x1 = a.x + boxW, y1 = a.y + boxH / 2, x2 = b.x, y2 = b.y + boxH / 2;
+      const mid = (x1 + x2) / 2;
+      const p = svgEl("path", {
+        class: "edge",
+        d: `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`,
+        "stroke-width": Math.min(1 + Math.log2(e.n), 4).toFixed(1),
+      }, edgeLayer);
+      for (const id of [e.src, e.dst]) {
+        if (!hotEdges.has(id)) hotEdges.set(id, []);
+        hotEdges.get(id).push(p);
+      }
+    }
+    function hot(id, on) {
+      for (const p of hotEdges.get(id) || []) p.classList.toggle("hot", on);
+    }
+    viz.appendChild(svg);
+  }
+
+  // ── HANDLERS: the board ─────────────────────────────────────────────
+  function drawHandlers(list) {
+    const viz = $("#viz");
+    viz.innerHTML = "";
+    const cap = document.createElement("div");
+    cap.className = "caption";
+    cap.textContent = `estimated ${list.length} handler-level function${list.length === 1 ? "" : "s"}` +
+      ` — uncalled roots with downstream reach · click one to see its blast radius`;
+    viz.appendChild(cap);
+    if (!list.length) return;
+    const table = document.createElement("table");
+    table.innerHTML = "<thead><tr><th>function</th><th>path</th><th>reach</th><th>direct</th></tr></thead>";
+    const tbody = document.createElement("tbody");
+    for (const h of list) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="mono">${esc(h.name)}</td><td class="mono">${esc(h.path)}</td>` +
+        `<td class="n">${h.reach}</td><td class="n">${h.direct}</td>`;
+      tr.addEventListener("click", () => runRadius(`${h.path}::${h.name}`, "out"));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    viz.appendChild(table);
+  }
+
+  // ── the ask loop ────────────────────────────────────────────────────
+  async function run(v, arg) {
+    setActive(v);
+    $("#arg").value = arg;
+    if (v === "map") {
+      drawMap(await api("/api/graph"));
+      show("viz");
+      return;
+    }
+    if (v === "handlers") {
+      drawHandlers(await api("/api/handlers"));
+      show("viz");
+      return;
+    }
+    if (v === "radius" && arg) {
+      await runRadius(arg, "in");
+      return;
+    }
+    const data = await api(`/api/verb?v=${encodeURIComponent(v)}&arg=${encodeURIComponent(arg)}`);
+    $("#out").innerHTML = linkify(esc(data.text));
+    show("out");
   }
 
   async function loadTree() {
-    const data = await (await fetch("/api/tree")).json();
+    const data = await api("/api/tree");
     $("#stats").textContent =
       `${data.stats.files} files · ${data.stats.entities} entities · ${data.stats.edges} edges`;
     const rail = $("#rail");
@@ -170,15 +406,9 @@
     const b = ev.target.closest("button");
     if (!b) return;
     const v = b.dataset.v;
-    if (v === "map" || v === "changed") run(v, "");
+    if (v === "map" || v === "changed" || v === "handlers") run(v, "");
     else if ($("#arg").value.trim()) run(v, $("#arg").value.trim());
-    else {
-      verb = v;
-      document.querySelectorAll("#tabs button").forEach(
-        (x) => x.classList.toggle("active", x === b)
-      );
-      $("#arg").focus();
-    }
+    else { setActive(v); $("#arg").focus(); }
   });
   $("#run").addEventListener("click", () => run(verb, $("#arg").value.trim()));
   $("#arg").addEventListener("keydown", (ev) => {
