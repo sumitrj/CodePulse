@@ -131,6 +131,40 @@ def test_cross_file_calls_resolve_through_import_forms(build, orders_src):
     assert edge.dst == Addr("billing.py", "total")
 
 
+# === AC5 addendum (found dogfooding): relative imports and mixed-target sorting ===
+
+@pytest.mark.parametrize("orders_src", [
+    "from .billing import total\n\ndef process(items):\n    return total(items)\n",
+    "from . import billing\n\ndef process(items):\n    return billing.total(items)\n",
+], ids=["relative-from-import", "relative-package-import"])
+def test_relative_imports_resolve_within_a_package(build, orders_src):
+    engine, _ = build({
+        "pkg/billing.py": BILLING,
+        "pkg/orders.py": orders_src,
+    })
+
+    edge = single(engine.outgoing(Addr("pkg/orders.py", "process"), kind="calls"))
+
+    assert edge.dst == Addr("pkg/billing.py", "total")
+
+
+def test_mixed_internal_and_external_targets_do_not_break_reads(build):
+    engine, _ = build({
+        "billing.py": BILLING,
+        "app.py": (
+            "import json\n"
+            "from billing import total\n"
+            "\n\n"
+            "def load(raw):\n"
+            "    return total(json.loads(raw))\n"
+        ),
+    })
+
+    dsts = {e.dst for e in engine.outgoing(Addr("app.py", "load"), kind="calls")}
+
+    assert dsts == {Addr("billing.py", "total"), External("json.loads")}
+
+
 # === AC6: self.method() resolves to Class.method; instantiation calls the class ===
 
 def test_self_method_call_resolves_to_class_method(build):

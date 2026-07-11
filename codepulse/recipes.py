@@ -130,6 +130,12 @@ def load_recipe(path: Path) -> Recipe:
     return recipe
 
 
+def builtin_recipes() -> list[Recipe]:
+    """Every recipe shipped with codepulse (the repo's recipes/ directory)."""
+    recipes_dir = Path(__file__).resolve().parent.parent / "recipes"
+    return [load_recipe(p) for p in sorted(recipes_dir.glob("*.yml"))]
+
+
 @dataclass(frozen=True)
 class CheckReport:
     ok: bool

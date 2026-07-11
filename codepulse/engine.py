@@ -55,6 +55,11 @@ class ApplyReport:
     extracted: tuple[str, ...]
 
 
+EXCLUDE_DIRS = {
+    ".git", ".venv", "venv", "env", "node_modules", "__pycache__",
+    ".pytest_cache", "dist", "build", ".codepulse", ".claude",
+}
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS files(
     path TEXT PRIMARY KEY, hash TEXT, recipe TEXT);
@@ -74,6 +79,10 @@ CREATE INDEX IF NOT EXISTS edges_dst ON edges(dst_path, dst_name);
 """
 
 
+def _join_module(module: str, member: str) -> str:
+    return module + member if module.endswith(".") else f"{module}.{member}"
+
+
 class Engine:
     def __init__(self, db_path: Path, recipes: Sequence[Recipe], root: Path):
         self.root = Path(root)
@@ -85,14 +94,36 @@ class Engine:
     # ── extraction ──────────────────────────────────────────────────────
 
     def apply(self) -> ApplyReport:
-        paths = sorted(
-            p for p in self.root.rglob("*")
-            if p.is_file() and self._recipe_for(p) is not None
-        )
-        return self._extract(paths)
+        return self._extract(self._scan())
 
     def update(self, changed: Iterable[Path]) -> ApplyReport:
         return self._extract(sorted(Path(p) for p in changed))
+
+    def refresh(self) -> ApplyReport:
+        """The freshness primitive: re-extract hash-changed files, forget deleted ones."""
+        known = dict(self.db.execute("SELECT path, hash FROM files"))
+        on_disk = {}
+        for path in self._scan():
+            rel = path.relative_to(self.root).as_posix()
+            try:
+                on_disk[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                continue
+        changed = [self.root / rel for rel, digest in sorted(on_disk.items())
+                   if known.get(rel) != digest]
+        for rel in sorted(set(known) - set(on_disk)):
+            self.db.execute("DELETE FROM entities WHERE path=?", (rel,))
+            self.db.execute("DELETE FROM edges WHERE src_path=?", (rel,))
+            self.db.execute("DELETE FROM files WHERE path=?", (rel,))
+        return self._extract(changed)
+
+    def _scan(self) -> list[Path]:
+        return sorted(
+            p for p in self.root.rglob("*")
+            if p.is_file()
+            and not any(part in EXCLUDE_DIRS for part in p.relative_to(self.root).parts)
+            and self._recipe_for(p) is not None
+        )
 
     def _recipe_for(self, path: Path) -> Recipe | None:
         for recipe in self.recipes:
@@ -254,10 +285,18 @@ class Engine:
         for row_id, src_path, target, meta in self.db.execute(
                 "SELECT id, src_path, target, meta FROM edges WHERE kind='imports'").fetchall():
             info = json.loads(meta)
-            mod_path = info["module"].replace(".", "/") + suffix_of(src_path)
+            suffix = suffix_of(src_path)
+            mod_path = self._module_path(info["module"], src_path, suffix)
             member = info["member"]
             if member and (mod_path, member) in ents:
                 self._set_dst(row_id, mod_path, member)
+            elif member and self._module_path(
+                    _join_module(info["module"], member), src_path, suffix) in files:
+                self._set_dst(
+                    row_id,
+                    self._module_path(_join_module(info["module"], member), src_path, suffix),
+                    "<module>",
+                )
             elif not member and mod_path in files:
                 self._set_dst(row_id, mod_path, "<module>")
             else:
@@ -281,8 +320,8 @@ class Engine:
             else:
                 self.db.execute("UPDATE edges SET status='dropped' WHERE id=?", (row_id,))
 
-    @staticmethod
-    def _resolve_target(target, src_path, src_name, binds, ents, files, suffix):
+    @classmethod
+    def _resolve_target(cls_, target, src_path, src_name, binds, ents, files, suffix):
         if target.startswith("self.") and "." in src_name:
             cls = src_name.rsplit(".", 1)[0]
             cand = (src_path, f"{cls}.{target[5:]}")
@@ -290,16 +329,36 @@ class Engine:
         head, _, rest = target.partition(".")
         if head in binds:
             module, member = binds[head]
-            mod_path = module.replace(".", "/") + suffix
+            mod_path = cls_._module_path(module, src_path, suffix)
             name = f"{member}.{rest}" if member and rest else (member or rest or None)
             if name and (mod_path, name) in ents:
                 return (mod_path, name)
+            if member:  # member may itself be a module of the package
+                mod2 = cls_._module_path(_join_module(module, member), src_path, suffix)
+                if rest and (mod2, rest) in ents:
+                    return (mod2, rest)
+                if not rest and mod2 in files:
+                    return (mod2, "<module>")
             if not name and mod_path in files:
                 return (mod_path, "<module>")
             return None
         if (src_path, target) in ents:
             return (src_path, target)
         return None
+
+    @staticmethod
+    def _module_path(module: str, src_path: str, suffix: str) -> str:
+        """Map a module name to a repo path; dot-prefixed modules resolve
+        relative to the importing file's directory (Python's `.`, TS's `./`)."""
+        if not module.startswith("."):
+            return module.replace(".", "/") + suffix
+        stripped = module.lstrip(".")
+        parts = Path(src_path).parent.parts
+        up = len(module) - len(stripped) - 1
+        base = parts[:len(parts) - up] if up <= len(parts) else ()
+        tail = stripped.replace(".", "/") if stripped else ""
+        joined = "/".join([*base, tail]) if tail else "/".join(base)
+        return (joined + suffix) if joined else ""
 
     def _set_dst(self, row_id, path, name):
         self.db.execute(
@@ -353,7 +412,10 @@ class Engine:
         return self._edges(sql, args)
 
     def _edges(self, sql, args) -> list[Edge]:
-        rows = sorted(self.db.execute(sql, args))
+        rows = sorted(
+            self.db.execute(sql, args),
+            key=lambda r: tuple("" if v is None else v for v in r),
+        )
         return [
             Edge(
                 src=Addr(sp, sn),
