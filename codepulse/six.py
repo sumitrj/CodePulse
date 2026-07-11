@@ -108,7 +108,8 @@ def radius(engine: Engine, name: str) -> str:
     by_depth = defaultdict(list)
     for ref, d in depth_of.items():
         by_depth[d].append(_label(ref))
-    lines = [f"Blast radius of {_label(addr)}: {len(depth_of)} entit(y/ies) at risk."]
+    count = len(depth_of)
+    lines = [f"Blast radius of {_label(addr)}: {count} {'entity' if count == 1 else 'entities'} at risk."]
     for d in sorted(by_depth):
         for entry in sorted(by_depth[d]):
             lines.append(f"  {'  ' * (d - 1)}[{d} hop{'s' if d > 1 else ''}] {entry}")
@@ -124,7 +125,7 @@ def what_changed(engine: Engine, paths: Iterable) -> str:
     lines = []
     for rel in report.extracted:
         touched = [e.addr for e in engine.entities(rel) if e.addr.name != "<module>"]
-        lines.append(f"Changed: {rel} — {len(touched)} entit(y/ies)")
+        lines.append(f"Changed: {rel} — {len(touched)} {'entity' if len(touched) == 1 else 'entities'}")
         for addr in touched:
             at_risk = sorted({
                 _label(ref) for ref in compute_radius(engine, addr)

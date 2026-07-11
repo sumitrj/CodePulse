@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodePulse</title>
+<style>
+  :root {
+    --ink:  #111;
+    --paper:#fff;
+    --mut:  #666;
+    --soft: #e6e6e6;
+    --hush: #f6f6f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink); background: var(--paper);
+    display: flex; flex-direction: column;
+  }
+  code, pre, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+
+  header {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 10px 14px; border-bottom: 1.5px solid var(--ink);
+  }
+  header h1 { font-size: 15px; font-weight: 700; letter-spacing: .08em; }
+  #stats { margin-left: auto; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--mut); }
+
+  #ask { display: flex; gap: 0; border-bottom: 1.5px solid var(--ink); }
+  .tabs { display: flex; }
+  .tabs button {
+    border: 0; border-right: 1px solid var(--soft); background: var(--paper);
+    padding: 8px 14px; font: inherit; font-size: 12px; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--ink); cursor: pointer;
+  }
+  .tabs button.active { background: var(--ink); color: var(--paper); }
+  #arg {
+    flex: 1; border: 0; border-left: 1.5px solid var(--ink);
+    padding: 8px 12px; font: inherit; background: var(--paper); color: var(--ink);
+  }
+  #arg:focus { outline: none; background: var(--hush); }
+  #run {
+    border: 0; border-left: 1.5px solid var(--ink); background: var(--paper);
+    padding: 8px 16px; font: inherit; font-size: 12px; text-transform: uppercase;
+    letter-spacing: .05em; cursor: pointer;
+  }
+  #run:hover { background: var(--ink); color: var(--paper); }
+
+  main { flex: 1; display: flex; min-height: 0; }
+  #rail { width: 280px; border-right: 1.5px solid var(--ink); overflow: auto; }
+  #rail .file { border-bottom: 1px solid var(--soft); }
+  #rail summary {
+    padding: 6px 10px; cursor: pointer; list-style: none;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--mut);
+  }
+  #rail summary::-webkit-details-marker { display: none; }
+  #rail details[open] summary { color: var(--ink); font-weight: 600; }
+  #rail .ent {
+    display: flex; gap: 8px; padding: 3px 10px 3px 20px; cursor: pointer;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+  }
+  #rail .ent:hover { background: var(--ink); color: var(--paper); }
+  #rail .ent .kind { margin-left: auto; color: var(--mut); font-size: 11px; }
+  #rail .ent:hover .kind { color: var(--paper); }
+
+  #stage { flex: 1; overflow: auto; padding: 14px; }
+  #out {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+    background: var(--hush); border: 1px solid var(--soft);
+    padding: 12px; white-space: pre-wrap; word-break: break-word; min-height: 120px;
+  }
+  #out .lnk { text-decoration: underline; cursor: pointer; }
+  #out .lnk:hover { background: var(--ink); color: var(--paper); }
+  #empty { color: var(--mut); text-align: center; padding: 60px 0; }
+
+  footer {
+    padding: 6px 14px; border-top: 1.5px solid var(--ink);
+    font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--mut);
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>CODEPULSE</h1>
+    <span id="stats">&nbsp;</span>
+  </header>
+
+  <div id="ask">
+    <nav class="tabs" id="tabs">
+      <button data-v="what" class="active">WHAT</button>
+      <button data-v="who">WHO</button>
+      <button data-v="radius">BREAKS</button>
+      <button data-v="changed">CHANGED</button>
+      <button data-v="locate">WHERE</button>
+      <button data-v="map">MAP</button>
+    </nav>
+    <input id="arg" placeholder="entity name, path::name, or words to locate" spellcheck="false">
+    <button id="run">Ask</button>
+  </div>
+
+  <main>
+    <aside id="rail"></aside>
+    <section id="stage">
+      <div id="empty">Pick an entity, or ask the map a question.</div>
+      <div id="out" hidden></div>
+    </section>
+  </main>
+
+  <footer>ONE MAP &middot; TWO READERS &middot; SIX QUESTIONS</footer>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  let verb = "what";
+
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  function linkify(t) {
+    return t.replace(
+      /((?:[\w.-]+\/)*[\w.-]+\.[\w]+) :: ([\w.-]+|&lt;module&gt;)/g,
+      '<span class="lnk" data-path="$1" data-name="$2">$&</span>'
+    );
+  }
+
+  async function run(v, arg) {
+    verb = v;
+    document.querySelectorAll("#tabs button").forEach(
+      (b) => b.classList.toggle("active", b.dataset.v === v)
+    );
+    $("#arg").value = arg;
+    const r = await fetch(`/api/verb?v=${encodeURIComponent(v)}&arg=${encodeURIComponent(arg)}`);
+    const data = await r.json();
+    $("#empty").hidden = true;
+    const out = $("#out");
+    out.hidden = false;
+    out.innerHTML = linkify(esc(data.text));
+  }
+
+  async function loadTree() {
+    const data = await (await fetch("/api/tree")).json();
+    $("#stats").textContent =
+      `${data.stats.files} files · ${data.stats.entities} entities · ${data.stats.edges} edges`;
+    const rail = $("#rail");
+    rail.innerHTML = "";
+    for (const f of data.files) {
+      const d = document.createElement("details");
+      d.className = "file";
+      const s = document.createElement("summary");
+      s.textContent = f.path;
+      d.appendChild(s);
+      for (const e of f.entities) {
+        const row = document.createElement("div");
+        row.className = "ent";
+        row.innerHTML = `<span>${esc(e.name)}</span><span class="kind">${esc(e.kind)}</span>`;
+        row.addEventListener("click", () => run("what", `${f.path}::${e.name}`));
+        d.appendChild(row);
+      }
+      rail.appendChild(d);
+    }
+  }
+
+  $("#tabs").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    const v = b.dataset.v;
+    if (v === "map" || v === "changed") run(v, "");
+    else if ($("#arg").value.trim()) run(v, $("#arg").value.trim());
+    else {
+      verb = v;
+      document.querySelectorAll("#tabs button").forEach(
+        (x) => x.classList.toggle("active", x === b)
+      );
+      $("#arg").focus();
+    }
+  });
+  $("#run").addEventListener("click", () => run(verb, $("#arg").value.trim()));
+  $("#arg").addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") run(verb, $("#arg").value.trim());
+  });
+  $("#out").addEventListener("click", (ev) => {
+    const l = ev.target.closest(".lnk");
+    if (l) run("what", `${l.dataset.path}::${l.dataset.name.replace(/&lt;|&gt;/g, "")}`);
+  });
+  window.addEventListener("focus", loadTree);
+
+  loadTree().then(() => run("map", ""));
+</script>
+</body>
+</html>

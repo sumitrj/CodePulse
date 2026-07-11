@@ -96,7 +96,9 @@ class Engine:
     def __init__(self, db_path: Path, recipes: Sequence[Recipe], root: Path):
         self.root = Path(root)
         self.recipes = list(recipes)
-        self.db = sqlite3.connect(db_path)
+        # one writer at a time by design; the panel server hands the engine
+        # to its handler thread, so don't pin the connection to this one
+        self.db = sqlite3.connect(db_path, check_same_thread=False)
         self.db.executescript(_SCHEMA)
         self._compiled = {}
 
