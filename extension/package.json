@@ -1,0 +1,42 @@
+{
+  "name": "codepulse",
+  "displayName": "CodePulse",
+  "description": "One map, two readers, six questions — your repo's entity-relation graph, for you and your agents.",
+  "version": "0.1.0",
+  "publisher": "sumitrj",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Visualization"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "codepulse", "title": "CodePulse", "icon": "media/pulse.svg" }
+      ]
+    },
+    "views": {
+      "codepulse": [
+        { "type": "webview", "id": "codepulse.panel", "name": "Pulse" }
+      ]
+    },
+    "commands": [
+      { "command": "codepulse.open", "title": "CodePulse: Open Panel" }
+    ],
+    "configuration": {
+      "title": "CodePulse",
+      "properties": {
+        "codepulse.python": {
+          "type": "string",
+          "default": "python3",
+          "description": "Python interpreter with the codepulse package installed"
+        },
+        "codepulse.port": {
+          "type": "number",
+          "default": 0,
+          "description": "Panel server port (0 = pick a free port)"
+        }
+      }
+    }
+  }
+}
