@@ -1,0 +1,39 @@
+# Python recipe — parity with the hand-written extractor (specs/relationships/SPEC.md).
+# The engine knows none of this; a language is this file.
+name: python
+version: "1"
+language: python
+matches: ["*.py"]
+module_suffix: ".py"
+
+entities:
+  - kind: function
+    query: "(function_definition name: (identifier) @name) @node"
+  - kind: class
+    query: "(class_definition name: (identifier) @name) @node"
+  - kind: state
+    query: "(module (assignment left: (identifier) @name) @node)"
+
+bindings:
+  # import m
+  - query: "(import_statement name: (dotted_name) @module)"
+  # import m as x
+  - query: "(import_statement name: (aliased_import name: (dotted_name) @module alias: (identifier) @alias))"
+  # from m import n
+  - query: "(import_from_statement module_name: (dotted_name) @module name: (dotted_name) @member)"
+  # from m import n as x
+  - query: "(import_from_statement module_name: (dotted_name) @module name: (aliased_import name: (dotted_name) @member alias: (identifier) @alias))"
+
+references:
+  - kind: calls
+    query: "(call function: (_) @target)"
+  - kind: inherits
+    query: "(class_definition superclasses: (argument_list (_) @target))"
+  - kind: reads
+    query: "(identifier) @target"
+    only: [state]
+    unresolved: drop
+  - kind: writes
+    query: "(global_statement (identifier) @target)"
+    only: [state]
+    unresolved: drop

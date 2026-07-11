@@ -1,0 +1,10 @@
+Red baseline for specs/recipes/SPEC.md — captured 2026-07-10, before implementation.
+
+uv run --extra dev python -m pytest tests/test_recipes.py -v
+
+ERROR collecting tests/test_recipes.py
+ModuleNotFoundError: No module named 'codepulse.recipes'
+
+All 20 tests (16 ACs; AC5 parametrized x4) are red via ImportError, as expected.
+When implementation lands, every one of these must flip to green, plus the
+existing suite (uv run --extra dev python -m pytest) must stay green.
