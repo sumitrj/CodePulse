@@ -1,0 +1,10 @@
+# YAML recipe — every mapping key is an entity; nesting gives dotted names
+# (server.port), so config keys are addressable like any function.
+name: yaml
+version: "1"
+language: yaml
+matches: ["*.yml", "*.yaml"]
+
+entities:
+  - kind: key
+    query: "(block_mapping_pair key: (flow_node) @name) @node"

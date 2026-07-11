@@ -1,0 +1,12 @@
+# Dockerfile recipe — COPY sources become edges into the repo tree.
+# Destinations and missing paths drop; the map never invents an edge.
+name: dockerfile
+version: "1"
+language: dockerfile
+matches: ["Dockerfile", "Dockerfile.*", "*.dockerfile"]
+
+references:
+  - kind: copies
+    query: "(copy_instruction (path) @target)"
+    resolve: path
+    unresolved: drop

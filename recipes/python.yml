@@ -1,7 +1,7 @@
 # Python recipe — parity with the hand-written extractor (specs/relationships/SPEC.md).
 # The engine knows none of this; a language is this file.
 name: python
-version: "2"
+version: "3"
 language: python
 matches: ["*.py"]
 module_suffix: ".py"
@@ -40,4 +40,11 @@ references:
   - kind: writes
     query: "(global_statement (identifier) @target)"
     only: [state]
+    unresolved: drop
+  # the convention edge: a string subscript may name a config entity
+  # (os.environ["DB_URL"] -> terraform variable / yaml key of that name)
+  - kind: reads
+    query: "(subscript subscript: (string (string_content) @target))"
+    resolve: name
+    only: [key, variable, output]
     unresolved: drop

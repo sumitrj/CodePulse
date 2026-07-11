@@ -1,0 +1,3 @@
+- src: Dockerfile:<module>
+  kind: copies
+  dst: app.py:<module>

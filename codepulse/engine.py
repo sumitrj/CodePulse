@@ -10,6 +10,7 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
+import posixpath
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -81,6 +82,14 @@ CREATE INDEX IF NOT EXISTS edges_dst ON edges(dst_path, dst_name);
 
 def _join_module(module: str, member: str) -> str:
     return module + member if module.endswith(".") else f"{module}.{member}"
+
+
+def _normalize(text: str, src_path: str) -> str | None:
+    """Resolve a path-style reference relative to its file; never escape the repo."""
+    p = posixpath.normpath(posixpath.join(posixpath.dirname(src_path), text))
+    if p.startswith(("../", "/")) or p == "..":
+        return None
+    return p
 
 
 class Engine:
@@ -172,12 +181,11 @@ class Engine:
                 name_nodes = captures.get("name") or []
                 if not name_nodes:
                     continue
-                name_node = name_nodes[0]
-                span_node = (captures.get("node") or [name_node])[0]
+                span_node = (captures.get("node") or [name_nodes[0]])[0]
                 found.append((
                     span_node.start_byte, span_node.end_byte,
-                    name_node.text.decode(), rule.kind,
-                    name_node.start_point[0] + 1,
+                    ".".join(n.text.decode() for n in name_nodes), rule.kind,
+                    name_nodes[0].start_point[0] + 1,
                 ))
         found.sort(key=lambda f: (f[0], -f[1]))
 
@@ -211,11 +219,12 @@ class Engine:
                 alias_node = (captures.get("alias") or [None])[0]
                 alias = alias_node.text.decode() if alias_node is not None else None
                 local = alias or (member.split(".")[-1] if member else module.split(".")[0])
-                target = f"{module}.{member}" if member else module
+                target = _join_module(module, member) if member else module
                 self._insert_edge(
                     rel, "<module>", "imports", target,
                     module_nodes[0].start_point[0] + 1,
-                    meta=json.dumps({"local": local, "module": module, "member": member}),
+                    meta=json.dumps({"local": local, "module": module,
+                                     "member": member, "style": rule.style}),
                     prov=prov,
                 )
 
@@ -234,7 +243,8 @@ class Engine:
                     self._insert_edge(
                         rel, src, rule.kind, text, line,
                         meta=json.dumps({"only": list(rule.only),
-                                         "unresolved": rule.unresolved}),
+                                         "unresolved": rule.unresolved,
+                                         "resolve": rule.resolve}),
                         prov=prov,
                     )
 
@@ -276,29 +286,33 @@ class Engine:
             recipe = recipe_by_name.get(file_recipe.get(path, ""))
             return recipe.module_suffix if recipe else ""
 
-        bindings: dict[str, dict[str, tuple[str, str | None]]] = {}
+        bindings: dict[str, dict[str, tuple[str, str | None, str]]] = {}
         for src_path, meta in self.db.execute(
                 "SELECT src_path, meta FROM edges WHERE kind='imports'"):
             info = json.loads(meta)
-            bindings.setdefault(src_path, {})[info["local"]] = (info["module"], info["member"])
+            bindings.setdefault(src_path, {})[info["local"]] = (
+                info["module"], info["member"], info.get("style", "module"))
 
         for row_id, src_path, target, meta in self.db.execute(
                 "SELECT id, src_path, target, meta FROM edges WHERE kind='imports'").fetchall():
             info = json.loads(meta)
             suffix = suffix_of(src_path)
-            mod_path = self._module_path(info["module"], src_path, suffix)
+            style = info.get("style", "module")
             member = info["member"]
-            if member and (mod_path, member) in ents:
-                self._set_dst(row_id, mod_path, member)
-            elif member and self._module_path(
-                    _join_module(info["module"], member), src_path, suffix) in files:
-                self._set_dst(
-                    row_id,
-                    self._module_path(_join_module(info["module"], member), src_path, suffix),
-                    "<module>",
-                )
-            elif not member and mod_path in files:
-                self._set_dst(row_id, mod_path, "<module>")
+            dst = None
+            for mod_path in self._module_candidates(info["module"], src_path, suffix, style):
+                if member and (mod_path, member) in ents:
+                    dst = (mod_path, member)
+                    break
+                if not member and mod_path in files:
+                    dst = (mod_path, "<module>")
+                    break
+            if dst is None and member and style == "module":
+                mod2 = self._module_path(_join_module(info["module"], member), src_path, suffix)
+                if mod2 in files:
+                    dst = (mod2, "<module>")
+            if dst is not None:
+                self._set_dst(row_id, *dst)
             else:
                 self._set_external(row_id, target)
 
@@ -306,12 +320,19 @@ class Engine:
                 "SELECT id, src_path, src_name, target, meta FROM edges "
                 "WHERE kind NOT IN ('imports','contains')").fetchall():
             cfg = json.loads(meta)
-            addr = self._resolve_target(
-                target, src_path, src_name,
-                bindings.get(src_path, {}), ents, files, suffix_of(src_path),
-            )
+            strategy = cfg.get("resolve", "lexical")
             only = tuple(cfg.get("only") or ())
-            if addr is not None and only and ents.get(addr) not in only:
+            if strategy == "path":
+                addr = self._path_lookup(target, src_path, suffix_of(src_path), files)
+            elif strategy == "name":
+                addr = self._name_lookup(target, ents, only)
+            else:
+                addr = self._resolve_target(
+                    target, src_path, src_name,
+                    bindings.get(src_path, {}), ents, files, suffix_of(src_path),
+                )
+            if addr is not None and only and strategy != "path" \
+                    and ents.get(addr) not in only:
                 addr = None
             if addr is not None:
                 self._set_dst(row_id, *addr)
@@ -320,31 +341,57 @@ class Engine:
             else:
                 self.db.execute("UPDATE edges SET status='dropped' WHERE id=?", (row_id,))
 
-    @classmethod
-    def _resolve_target(cls_, target, src_path, src_name, binds, ents, files, suffix):
+    def _resolve_target(self, target, src_path, src_name, binds, ents, files, suffix):
         if target.startswith("self.") and "." in src_name:
             cls = src_name.rsplit(".", 1)[0]
             cand = (src_path, f"{cls}.{target[5:]}")
             return cand if cand in ents else None
         head, _, rest = target.partition(".")
         if head in binds:
-            module, member = binds[head]
-            mod_path = cls_._module_path(module, src_path, suffix)
+            module, member, style = binds[head]
             name = f"{member}.{rest}" if member and rest else (member or rest or None)
-            if name and (mod_path, name) in ents:
-                return (mod_path, name)
-            if member:  # member may itself be a module of the package
-                mod2 = cls_._module_path(_join_module(module, member), src_path, suffix)
+            for mod_path in self._module_candidates(module, src_path, suffix, style):
+                if name and (mod_path, name) in ents:
+                    return (mod_path, name)
+                if not name and mod_path in files:
+                    return (mod_path, "<module>")
+            if member and style == "module":  # member may itself be a module of the package
+                mod2 = self._module_path(_join_module(module, member), src_path, suffix)
                 if rest and (mod2, rest) in ents:
                     return (mod2, rest)
                 if not rest and mod2 in files:
                     return (mod2, "<module>")
-            if not name and mod_path in files:
-                return (mod_path, "<module>")
             return None
         if (src_path, target) in ents:
             return (src_path, target)
         return None
+
+    def _module_candidates(self, module, src_path, suffix, style) -> list[str]:
+        if style == "path":
+            p = _normalize(module, src_path)
+            if p is None:
+                return []
+            return [p, p + suffix] if suffix else [p]
+        return [self._module_path(module, src_path, suffix)]
+
+    def _path_lookup(self, target, src_path, suffix, files):
+        """Path-style reference: resolve against the repo tree itself, so an
+        edge to a real file holds even when no recipe extracts that file."""
+        p = _normalize(target, src_path)
+        if p is None:
+            return None
+        for candidate in ([p, p + suffix] if suffix else [p]):
+            if candidate in files or (self.root / candidate).is_file():
+                return (candidate, "<module>")
+        return None
+
+    @staticmethod
+    def _name_lookup(target, ents, only):
+        hits = sorted(
+            (p, n) for (p, n), k in ents.items()
+            if (n == target or n.endswith("." + target)) and (not only or k in only)
+        )
+        return hits[0] if hits else None
 
     @staticmethod
     def _module_path(module: str, src_path: str, suffix: str) -> str:

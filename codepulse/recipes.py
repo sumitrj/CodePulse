@@ -37,6 +37,7 @@ class EntityRule:
 @dataclass(frozen=True)
 class BindingRule:
     query: str
+    style: str = "module"            # "module": dotted name maps to a path; "path": text is a relative path
 
 
 @dataclass(frozen=True)
@@ -108,7 +109,8 @@ def load_recipe(path: Path) -> Recipe:
             for e in data.get("entities") or ()
         ),
         bindings=tuple(
-            BindingRule(query=b["query"]) for b in data.get("bindings") or ()
+            BindingRule(query=b["query"], style=b.get("style", "module"))
+            for b in data.get("bindings") or ()
         ),
         references=tuple(
             ReferenceRule(

@@ -1,0 +1,15 @@
+# HTML recipe — script src and link href become load edges into the repo tree.
+name: html
+version: "1"
+language: html
+matches: ["*.html", "*.htm"]
+
+references:
+  - kind: loads
+    query: '((attribute (attribute_name) @_a (quoted_attribute_value (attribute_value) @target)) (#eq? @_a "src"))'
+    resolve: path
+    unresolved: drop
+  - kind: loads
+    query: '((attribute (attribute_name) @_a (quoted_attribute_value (attribute_value) @target)) (#eq? @_a "href"))'
+    resolve: path
+    unresolved: drop

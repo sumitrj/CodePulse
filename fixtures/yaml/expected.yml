@@ -1,0 +1,6 @@
+- src: config.yml:<module>
+  kind: contains
+  dst: config.yml:server
+- src: config.yml:server
+  kind: contains
+  dst: config.yml:server.port

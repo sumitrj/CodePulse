@@ -1,0 +1,31 @@
+# TypeScript recipe — functions, classes, methods, arrow consts; ./ imports
+# resolve as paths (the engine capability relative Python imports paid for).
+name: typescript
+version: "1"
+language: typescript
+matches: ["*.ts"]
+module_suffix: ".ts"
+
+entities:
+  - kind: function
+    query: "(function_declaration name: (identifier) @name) @node"
+  - kind: class
+    query: "(class_declaration name: (type_identifier) @name) @node"
+  - kind: method
+    query: "(method_definition name: (property_identifier) @name) @node"
+  - kind: function
+    query: "((lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function))) @node)"
+
+bindings:
+  # import { x } from "./m"
+  - style: path
+    query: "(import_statement (import_clause (named_imports (import_specifier name: (identifier) @member))) source: (string (string_fragment) @module))"
+  # import x from "./m"
+  - style: path
+    query: "(import_statement (import_clause (identifier) @alias) source: (string (string_fragment) @module))"
+
+references:
+  - kind: calls
+    query: "(call_expression function: (_) @target)"
+  - kind: inherits
+    query: "(class_heritage (extends_clause value: (_) @target))"

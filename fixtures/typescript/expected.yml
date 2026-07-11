@@ -1,0 +1,6 @@
+- src: main.ts:boot
+  kind: calls
+  dst: util.ts:helper
+- src: main.ts:<module>
+  kind: imports
+  dst: util.ts:helper

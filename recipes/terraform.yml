@@ -1,0 +1,14 @@
+# Terraform recipe — variable/resource/output blocks become entities.
+# Resources get terraform-style dotted names (aws_s3_bucket.data).
+name: terraform
+version: "1"
+language: terraform
+matches: ["*.tf"]
+
+entities:
+  - kind: variable
+    query: '((block (identifier) @_t (string_lit (template_literal) @name)) (#eq? @_t "variable"))'
+  - kind: resource
+    query: '((block (identifier) @_t (string_lit (template_literal) @name) (string_lit (template_literal) @name)) (#eq? @_t "resource"))'
+  - kind: output
+    query: '((block (identifier) @_t (string_lit (template_literal) @name)) (#eq? @_t "output"))'

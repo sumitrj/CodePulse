@@ -1,0 +1,9 @@
+- src: infra.tf:<module>
+  kind: contains
+  dst: infra.tf:DB_URL
+- src: infra.tf:<module>
+  kind: contains
+  dst: infra.tf:aws_s3_bucket.data
+- src: infra.tf:<module>
+  kind: contains
+  dst: infra.tf:bucket_name

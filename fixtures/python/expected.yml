@@ -1,0 +1,6 @@
+- src: orders.py:process
+  kind: calls
+  dst: billing.py:total
+- src: orders.py:<module>
+  kind: imports
+  dst: billing.py:total
