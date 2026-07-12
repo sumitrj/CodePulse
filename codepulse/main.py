@@ -71,6 +71,7 @@ def build_engine(root: Path, announce: bool = True) -> Engine:
                 last["t"] = time.time()
                 print(f"  map   : {done}/{total} files…", flush=True)
         engine.progress = progress
+        print("  map   : checking freshness…", flush=True)
     started = time.time()
     report = engine.refresh()
     if announce:
@@ -117,8 +118,11 @@ def main(argv: list[str] | None = None) -> None:
         return
     from .panel import make_server
     server = make_server(engine, args.port)
-    print(f"  panel : http://127.0.0.1:{server.server_address[1]}")
-    print("done. Open Claude Code here (approve 'codepulse' when asked) — ctrl-c stops the panel.")
+    print(f"  panel : http://127.0.0.1:{server.server_address[1]}  <- open this in a browser")
+    print()
+    print("this command keeps running (it is the panel). In ANOTHER terminal:")
+    print(f"  cd {root} && claude     # approve 'codepulse' when asked, then ask it things")
+    print("ctrl-c here only stops the panel — Claude Code runs its own map server.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -6,6 +6,7 @@ through codepulse.six, the same code that answers agents over MCP.
 See specs/panel/SPEC.md.
 """
 import json
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -67,9 +68,24 @@ def tree(engine: Engine) -> dict:
 
 
 def make_server(engine: Engine, port: int = 7317) -> HTTPServer:
+    last_refresh = {"t": 0.0}
+
+    def fresh():
+        # the panel fires several requests per view; one scan per 2s keeps the
+        # freshness promise without queueing a hash-walk behind every call
+        if time.time() - last_refresh["t"] > 2.0:
+            last_refresh["t"] = time.time()
+            engine.refresh()
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):  # keep stdio quiet; this runs under an editor
             pass
+
+        def handle(self):
+            try:
+                super().handle()
+            except (BrokenPipeError, ConnectionResetError):
+                pass               # the browser hung up mid-response; not our problem
 
         def do_GET(self):
             url = urlparse(self.path)
@@ -79,37 +95,37 @@ def make_server(engine: Engine, port: int = 7317) -> HTTPServer:
                     body = _WEBVIEW.read_bytes()
                     content_type = "text/html; charset=utf-8"
                 elif url.path == "/api/tree":
-                    engine.refresh()
+                    fresh()
                     body = json.dumps(tree(engine)).encode()
                 elif url.path == "/api/verb":
                     query = parse_qs(url.query)
-                    engine.refresh()
+                    fresh()
                     text = answer(engine, query.get("v", [""])[0], query.get("arg", [""])[0])
                     body = json.dumps({"text": text}).encode()
                 elif url.path == "/api/card":
                     query = parse_qs(url.query)
-                    engine.refresh()
+                    fresh()
                     data = boards.card(engine, query.get("name", [""])[0])
                     body = json.dumps(data if data else {"entity": None}).encode()
                 elif url.path == "/api/search":
                     from .search import search as hybrid_search
                     query = parse_qs(url.query)
-                    engine.refresh()
+                    fresh()
                     body = json.dumps(
                         hybrid_search(engine, query.get("q", [""])[0])).encode()
                 elif url.path == "/api/handlers":
-                    engine.refresh()
+                    fresh()
                     body = json.dumps(boards.handlers(engine)).encode()
                 elif url.path == "/api/radius":
                     query = parse_qs(url.query)
-                    engine.refresh()
+                    fresh()
                     body = json.dumps(boards.radius_graph(
                         engine,
                         query.get("name", [""])[0],
                         direction=query.get("dir", ["in"])[0],
                     )).encode()
                 elif url.path == "/api/graph":
-                    engine.refresh()
+                    fresh()
                     body = json.dumps(boards.file_graph(engine)).encode()
                 else:
                     self.send_response(404)
