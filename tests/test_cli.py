@@ -11,7 +11,7 @@ import pytest
 
 from codepulse import main as cli
 from codepulse.engine import Engine
-from codepulse.recipes import builtin_recipes, load_recipe
+from codepulse.recipes import builtin_recipes, load_recipe, RECIPES_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -60,7 +60,7 @@ def test_codepulse_ignore_file_excludes_directories(tmp_path):
     (repo / ".codepulse").mkdir()
     (repo / ".codepulse" / "ignore").write_text("# scoped out\nvendor-clone\n")
     engine = Engine(tmp_path / "pulse.db",
-                    [load_recipe(ROOT / "recipes" / "python.yml")], root=repo)
+                    [load_recipe(RECIPES_DIR / "python.yml")], root=repo)
 
     engine.apply()
 

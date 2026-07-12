@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from codepulse.recipes import load_recipe
+from codepulse.recipes import load_recipe, RECIPES_DIR
 from codepulse.engine import Engine
 from codepulse import panel  # ImportError until implementation — expected
 
@@ -28,7 +28,7 @@ def engine(tmp_path):
     repo.mkdir()
     for rel, src in FILES.items():
         (repo / rel).write_text(src)
-    eng = Engine(tmp_path / "pulse.db", [load_recipe(ROOT / "recipes" / "python.yml")], root=repo)
+    eng = Engine(tmp_path / "pulse.db", [load_recipe(RECIPES_DIR / "python.yml")], root=repo)
     eng.apply()
     return eng
 

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from codepulse.recipes import load_recipe
+from codepulse.recipes import load_recipe, RECIPES_DIR
 from codepulse.engine import Addr, Engine
 from codepulse import boards, panel, six
 from codepulse import search as pulse_search  # ImportError until implementation — expected
@@ -44,7 +44,7 @@ def engine(tmp_path):
     repo.mkdir()
     for rel, src in FILES.items():
         (repo / rel).write_text(src)
-    eng = Engine(tmp_path / "pulse.db", [load_recipe(ROOT / "recipes" / "python.yml")], root=repo)
+    eng = Engine(tmp_path / "pulse.db", [load_recipe(RECIPES_DIR / "python.yml")], root=repo)
     eng.apply()
     return eng
 
@@ -101,7 +101,7 @@ def test_old_database_without_meta_column_migrates(tmp_path):
     repo.mkdir()
     (repo / "a.py").write_text("def f():\n    return 1\n")
 
-    engine = Engine(db_path, [load_recipe(ROOT / "recipes" / "python.yml")], root=repo)
+    engine = Engine(db_path, [load_recipe(RECIPES_DIR / "python.yml")], root=repo)
     engine.apply()
 
     assert any(e.addr.name == "f" for e in engine.entities("a.py"))
@@ -111,7 +111,7 @@ def test_old_database_without_meta_column_migrates(tmp_path):
 
 def test_refresh_reextracts_when_recipe_version_changes(tmp_path):
     import dataclasses
-    recipe = load_recipe(ROOT / "recipes" / "python.yml")
+    recipe = load_recipe(RECIPES_DIR / "python.yml")
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "a.py").write_text("def f():\n    return 1\n")

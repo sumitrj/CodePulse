@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from codepulse.recipes import (  # ImportError until implementation — expected
+from codepulse.recipes import (
+    RECIPES_DIR,
     CheckReport,
     Recipe,
     RecipeError,
@@ -21,7 +22,7 @@ from codepulse.engine import (  # ImportError until implementation — expected
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON_RECIPE_PATH = ROOT / "recipes" / "python.yml"
+PYTHON_RECIPE_PATH = RECIPES_DIR / "python.yml"
 
 TOY_RECIPE = """\
 name: yaml-keys

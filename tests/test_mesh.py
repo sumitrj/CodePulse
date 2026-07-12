@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from codepulse.recipes import builtin_recipes, check_recipe, load_recipe
+from codepulse.recipes import builtin_recipes, check_recipe, load_recipe, RECIPES_DIR
 from codepulse.engine import Addr, Engine
 from codepulse import six
 
@@ -70,7 +70,7 @@ def mesh(tmp_path_factory):
 
 # === AC1: every shipped recipe passes its fixture check ===
 
-@pytest.mark.parametrize("recipe_path", sorted((ROOT / "recipes").glob("*.yml")),
+@pytest.mark.parametrize("recipe_path", sorted(RECIPES_DIR.glob("*.yml")),
                          ids=lambda p: p.stem)
 def test_recipe_passes_its_fixture(recipe_path):
     recipe = load_recipe(recipe_path)

@@ -19,13 +19,8 @@ from .recipes import builtin_recipes
 
 
 def _skill_source() -> Path | None:
-    for candidate in (
-        Path(__file__).resolve().parent.parent / "skill" / "SKILL.md",   # repo checkout
-        Path(__file__).resolve().parent / "_skill" / "SKILL.md",         # installed wheel
-    ):
-        if candidate.is_file():
-            return candidate
-    return None
+    from .recipes import SKILL_PATH
+    return SKILL_PATH if SKILL_PATH.is_file() else None
 
 
 def _mcp_command(root: Path) -> dict:

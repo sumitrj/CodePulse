@@ -6,8 +6,9 @@ through codepulse.six, the same code that answers agents over MCP.
 See specs/panel/SPEC.md.
 """
 import json
+import threading
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -67,12 +68,14 @@ def tree(engine: Engine) -> dict:
     }
 
 
-def make_server(engine: Engine, port: int = 7317) -> HTTPServer:
+def make_server(engine: Engine, port: int = 7317) -> ThreadingHTTPServer:
+    # threaded so the browser's parallel requests never deadlock a single
+    # worker; one lock serializes DB access (SQLite writes aren't concurrent)
+    # and coalesces the freshness scan so a slow re-hash runs at most once.
+    lock = threading.Lock()
     last_refresh = {"t": 0.0}
 
     def fresh():
-        # the panel fires several requests per view; one scan per 2s keeps the
-        # freshness promise without queueing a hash-walk behind every call
         if time.time() - last_refresh["t"] > 2.0:
             last_refresh["t"] = time.time()
             engine.refresh()
@@ -92,47 +95,21 @@ def make_server(engine: Engine, port: int = 7317) -> HTTPServer:
             content_type = "application/json"
             try:
                 if url.path == "/":
-                    body = _WEBVIEW.read_bytes()
+                    body = _WEBVIEW.read_bytes()   # no DB, no lock — always instant
                     content_type = "text/html; charset=utf-8"
-                elif url.path == "/api/tree":
-                    fresh()
-                    body = json.dumps(tree(engine)).encode()
-                elif url.path == "/api/verb":
-                    query = parse_qs(url.query)
-                    fresh()
-                    text = answer(engine, query.get("v", [""])[0], query.get("arg", [""])[0])
-                    body = json.dumps({"text": text}).encode()
-                elif url.path == "/api/card":
-                    query = parse_qs(url.query)
-                    fresh()
-                    data = boards.card(engine, query.get("name", [""])[0])
-                    body = json.dumps(data if data else {"entity": None}).encode()
-                elif url.path == "/api/search":
-                    from .search import search as hybrid_search
-                    query = parse_qs(url.query)
-                    fresh()
-                    body = json.dumps(
-                        hybrid_search(engine, query.get("q", [""])[0])).encode()
-                elif url.path == "/api/handlers":
-                    fresh()
-                    body = json.dumps(boards.handlers(engine)).encode()
-                elif url.path == "/api/radius":
-                    query = parse_qs(url.query)
-                    fresh()
-                    body = json.dumps(boards.radius_graph(
-                        engine,
-                        query.get("name", [""])[0],
-                        direction=query.get("dir", ["in"])[0],
-                    )).encode()
-                elif url.path == "/api/graph":
-                    fresh()
-                    body = json.dumps(boards.file_graph(engine)).encode()
-                else:
-                    self.send_response(404)
-                    self.end_headers()
+                    self._send(body, content_type)
                     return
+                with lock:
+                    body = self._api(url)
             except Exception as exc:
                 body = json.dumps({"text": f"codepulse error: {exc}"}).encode()
+            if body is None:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self._send(body, content_type)
+
+        def _send(self, body, content_type):
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
@@ -140,7 +117,33 @@ def make_server(engine: Engine, port: int = 7317) -> HTTPServer:
             self.end_headers()
             self.wfile.write(body)
 
-    return HTTPServer(("127.0.0.1", port), Handler)
+        def _api(self, url):
+            """Return the JSON body for an /api/* path, or None for 404.
+            Runs under the shared lock — every branch touches the DB."""
+            query = parse_qs(url.query)
+            fresh()
+            if url.path == "/api/tree":
+                return json.dumps(tree(engine)).encode()
+            if url.path == "/api/verb":
+                text = answer(engine, query.get("v", [""])[0], query.get("arg", [""])[0])
+                return json.dumps({"text": text}).encode()
+            if url.path == "/api/card":
+                data = boards.card(engine, query.get("name", [""])[0])
+                return json.dumps(data if data else {"entity": None}).encode()
+            if url.path == "/api/search":
+                from .search import search as hybrid_search
+                return json.dumps(hybrid_search(engine, query.get("q", [""])[0])).encode()
+            if url.path == "/api/handlers":
+                return json.dumps(boards.handlers(engine)).encode()
+            if url.path == "/api/radius":
+                return json.dumps(boards.radius_graph(
+                    engine, query.get("name", [""])[0],
+                    direction=query.get("dir", ["in"])[0])).encode()
+            if url.path == "/api/graph":
+                return json.dumps(boards.file_graph(engine)).encode()
+            return None
+
+    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
 
 
 def serve(root: Path, port: int = 7317) -> None:

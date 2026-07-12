@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from codepulse.recipes import load_recipe
+from codepulse.recipes import load_recipe, RECIPES_DIR
 from codepulse.engine import Addr, Engine
 from codepulse import six  # ImportError until implementation — expected
 
@@ -22,7 +22,7 @@ FILES = {
 
 @pytest.fixture
 def python_recipe():
-    return load_recipe(ROOT / "recipes" / "python.yml")
+    return load_recipe(RECIPES_DIR / "python.yml")
 
 
 @pytest.fixture

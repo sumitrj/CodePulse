@@ -139,15 +139,13 @@ def load_recipe(path: Path) -> Recipe:
     return recipe
 
 
+RECIPES_DIR = Path(__file__).resolve().parent / "recipes"    # package data
+SKILL_PATH = Path(__file__).resolve().parent / "skill" / "SKILL.md"
+
+
 def builtin_recipes() -> list[Recipe]:
-    """Every recipe shipped with codepulse — repo checkout or installed wheel."""
-    for recipes_dir in (
-        Path(__file__).resolve().parent.parent / "recipes",   # repo checkout
-        Path(__file__).resolve().parent / "_recipes",         # installed wheel
-    ):
-        if recipes_dir.is_dir():
-            return [load_recipe(p) for p in sorted(recipes_dir.glob("*.yml"))]
-    return []
+    """Every recipe shipped with codepulse (package data)."""
+    return [load_recipe(p) for p in sorted(RECIPES_DIR.glob("*.yml"))]
 
 
 @dataclass(frozen=True)

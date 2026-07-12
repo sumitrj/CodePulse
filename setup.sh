@@ -35,7 +35,7 @@ PYEOF
 
 # 3. the Claude skill
 mkdir -p "$REPO/.claude/skills/codepulse"
-cp "$PULSE_DIR/skill/SKILL.md" "$REPO/.claude/skills/codepulse/SKILL.md"
+cp "$PULSE_DIR/codepulse/skill/SKILL.md" "$REPO/.claude/skills/codepulse/SKILL.md"
 echo "  skill : $REPO/.claude/skills/codepulse/SKILL.md"
 
 # 4. warm the map so the first question is instant
