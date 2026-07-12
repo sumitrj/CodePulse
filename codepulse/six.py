@@ -53,12 +53,20 @@ def what_is(engine: Engine, name: str) -> str:
             for e in engine.incoming(addr, kind=kind)
             if e.src.name != "<module>"
         })
+        says = ""
+        if entity.doc and entity.meta:
+            says = f"  says       : {entity.meta.splitlines()[0]}\n"
+        hint = ("\n  note       : nothing on the map calls this — tests and "
+                "dynamically-invoked functions look like this."
+                if not dependents else "")
         cards.append(
             f"{addr.path} :: {addr.name}  [{entity.kind}]  via {entity.recipe}@{entity.recipe_version}\n"
             f"  line {entity.line}\n"
-            f"  calls      : {', '.join(calls) or '-'}\n"
+            + says
+            + f"  calls      : {', '.join(calls) or '-'}\n"
             f"  dependents : {len(dependents)}"
             + (f" — {', '.join(dependents)}" if dependents else "")
+            + hint
         )
     if len(hits) > 3:
         cards.append(f"(+{len(hits) - 3} more matches)")
@@ -141,22 +149,16 @@ def what_changed(engine: Engine, paths: Iterable) -> str:
 # ── verb 5: where does X live? ────────────────────────────────────────
 
 def locate(engine: Engine, query: str) -> str:
-    tokens = [t for t in query.lower().replace("_", " ").split() if len(t) > 2]
-    if not tokens:
-        return "Query too short."
-    scored = []
-    for entity in engine.entities():
-        if entity.addr.name == "<module>":
-            continue
-        name = entity.addr.name.lower().replace("_", " ").replace(".", " ")
-        path = entity.addr.path.lower()
-        score = sum((3 if t in name else 0) + (1 if t in path else 0) for t in tokens)
-        if score:
-            scored.append((score, entity.addr.path, entity.addr.name))
-    if not scored:
+    from .search import search  # hybrid: exact + fuzzy + what docstrings say
+
+    hits = search(engine, query, limit=5)
+    if not hits:
         return f"Nothing in the map matches '{query}'."
-    scored.sort(key=lambda s: (-s[0], s[1], s[2]))
-    return "\n".join(f"[score {s}] {p} :: {n}" for s, p, n in scored[:5])
+    return "\n".join(
+        f"[score {h['score']}] {h['path']} :: {h['name']}"
+        + (f"  — {h['meta'].splitlines()[0][:80]}" if h["meta"] else "")
+        for h in hits
+    )
 
 
 # ── the bonus verb: system silhouette ─────────────────────────────────

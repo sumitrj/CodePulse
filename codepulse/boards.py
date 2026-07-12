@@ -84,6 +84,43 @@ def _reach_depths(engine: Engine, target: Addr) -> dict[Addr, int]:
     return depth_of
 
 
+def card(engine: Engine, name: str) -> dict | None:
+    """The ERD-for-one-entity: the entity with its own words (meta), who
+    touches it, what it touches, and the outside world grouped honestly."""
+    hits = six.find(engine, name)
+    if not hits:
+        return None
+    addr = hits[0]
+    entity = next((e for e in engine.entities(addr.path) if e.addr == addr), None)
+    if entity is None:
+        return None
+    kinds = {e.addr: e.kind for e in engine.entities()}
+
+    incoming = [
+        {"path": e.src.path, "name": e.src.name,
+         "kind": kinds.get(e.src, ""), "edge_kind": e.kind}
+        for e in sorted(engine.incoming(addr), key=lambda e: (e.kind, e.src.path, e.src.name))
+        if e.kind != "contains"
+    ]
+    outgoing, external = [], []
+    for e in sorted(engine.outgoing(addr), key=lambda e: (e.kind, str(e.dst))):
+        if e.kind == "contains":
+            continue
+        if isinstance(e.dst, Addr):
+            outgoing.append({"path": e.dst.path, "name": e.dst.name,
+                             "kind": kinds.get(e.dst, ""), "edge_kind": e.kind})
+        else:
+            external.append(e.dst.name)
+    return {
+        "entity": {"path": addr.path, "name": addr.name, "kind": entity.kind,
+                   "line": entity.line, "meta": entity.meta, "doc": entity.doc,
+                   "recipe": entity.recipe, "recipe_version": entity.recipe_version},
+        "incoming": incoming,
+        "outgoing": outgoing,
+        "external": sorted(set(external)),
+    }
+
+
 def radius_graph(engine: Engine, name: str, direction: str = "in") -> dict:
     """The hop diagram. direction "in" = blast radius (who breaks if the target
     changes); "out" = reach (what the target calls, transitively)."""

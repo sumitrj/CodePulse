@@ -86,6 +86,17 @@ def make_server(engine: Engine, port: int = 7317) -> HTTPServer:
                     engine.refresh()
                     text = answer(engine, query.get("v", [""])[0], query.get("arg", [""])[0])
                     body = json.dumps({"text": text}).encode()
+                elif url.path == "/api/card":
+                    query = parse_qs(url.query)
+                    engine.refresh()
+                    data = boards.card(engine, query.get("name", [""])[0])
+                    body = json.dumps(data if data else {"entity": None}).encode()
+                elif url.path == "/api/search":
+                    from .search import search as hybrid_search
+                    query = parse_qs(url.query)
+                    engine.refresh()
+                    body = json.dumps(
+                        hybrid_search(engine, query.get("q", [""])[0])).encode()
                 elif url.path == "/api/handlers":
                     engine.refresh()
                     body = json.dumps(boards.handlers(engine)).encode()

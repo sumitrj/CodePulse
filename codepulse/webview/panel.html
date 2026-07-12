@@ -148,6 +148,41 @@
   tbody tr { cursor: pointer; }
   tbody tr:hover td { background: var(--ink); color: var(--paper) !important; }
 
+  /* ── the card ── */
+  .card { border: 1.5px solid var(--ink); padding: 16px; margin-bottom: 14px; }
+  .card .head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .card .head .nm { font-family: var(--mono); font-size: calc(var(--fs) + 2px); font-weight: 700; }
+  .card .pill { border: 1px solid var(--ink); padding: 1px 7px; font-size: calc(var(--fs-small) - 1px);
+                text-transform: uppercase; letter-spacing: .04em; }
+  .card .where { color: var(--mut); font-size: var(--fs-small); font-family: var(--mono); }
+  .card .prov { margin-left: auto; color: var(--mut); font-size: calc(var(--fs-small) - 1px);
+                text-transform: uppercase; letter-spacing: .05em; }
+  .card .says { margin: 10px 0 2px; font-size: var(--fs); }
+  .card .says.src { font-family: var(--mono); font-size: var(--fs-small); color: var(--mut); }
+  .sect { margin-top: 14px; }
+  .sect .sh { font-size: calc(var(--fs-small) - 1px); text-transform: uppercase;
+              letter-spacing: .05em; color: var(--mut); margin-bottom: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--ink); padding: 2px 8px; font-family: var(--mono);
+          font-size: var(--fs-small); cursor: pointer; }
+  .chip:hover { background: var(--ink); color: var(--paper); }
+  .chip small { color: var(--mut); }
+  .chip:hover small { color: var(--paper); }
+  .chip.ext { border-color: var(--soft); color: var(--mut); cursor: default; }
+  .hintline { color: var(--mut); font-size: var(--fs-small); }
+
+  /* ── search results ── */
+  .hit { border: 1.5px solid var(--ink); border-bottom: 0; padding: 8px 12px; cursor: pointer;
+         display: flex; gap: 12px; align-items: baseline; }
+  .hit:last-of-type { border-bottom: 1.5px solid var(--ink); }
+  .hit:hover { background: var(--ink); color: var(--paper); }
+  .hit:hover * { color: var(--paper) !important; }
+  .hit .sc { font-family: var(--mono); font-size: var(--fs-small); width: 42px; color: var(--mut); }
+  .hit .nm { font-family: var(--mono); font-size: var(--fs-mono); font-weight: 600; }
+  .hit .pt { font-family: var(--mono); font-size: var(--fs-small); color: var(--mut); }
+  .hit .mt { color: var(--mut); font-size: var(--fs-small); overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
   /* ── settings: four rows, segmented, instant ── */
   #viz .setrow { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--soft); }
   #viz .setrow .lbl {
@@ -191,8 +226,8 @@
       <button data-v="map" class="active">MAP</button>
       <button data-v="handlers">HANDLERS</button>
     </nav>
-    <input id="arg" placeholder="entity name, path::name, or words to locate" spellcheck="false">
-    <button id="run">ASK</button>
+    <input id="arg" placeholder="search the map — a name, a typo, or words from a docstring" spellcheck="false">
+    <button id="run">SEARCH</button>
   </div>
 
   <main>
@@ -524,10 +559,148 @@
     viz.appendChild(table);
   }
 
+  // ── the card: an entity you can understand at a glance ──────────────
+  function chip(node, onclick) {
+    const c = document.createElement("span");
+    c.className = "chip " + kindClass(node.kind);
+    c.innerHTML = `${esc(node.name)} <small>${esc(node.path)}${node.edge_kind ? " · " + esc(node.edge_kind) : ""}</small>`;
+    if (onclick) c.addEventListener("click", onclick);
+    return c;
+  }
+
+  function cardSection(parent, header, nodes, emptyHint) {
+    const s = document.createElement("div");
+    s.className = "sect";
+    s.innerHTML = `<div class="sh">${header}</div>`;
+    if (nodes.length) {
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      for (const n of nodes) chips.appendChild(chip(n, () => run("what", `${n.path}::${n.name}`)));
+      s.appendChild(chips);
+    } else {
+      s.innerHTML += `<div class="hintline">${emptyHint}</div>`;
+    }
+    parent.appendChild(s);
+    return s;
+  }
+
+  function drawLocalMap(viz, data) {
+    const boxW = 210, boxH = 30, gap = 8, colGap = 120, top = 30;
+    const left = data.incoming.slice(0, 12);
+    const right = data.outgoing.slice(0, 12);
+    if (data.external.length) right.push({ name: `outside the map (${data.external.length})`,
+      path: data.external.slice(0, 3).join(" · "), kind: "", ext: true });
+    const rows = Math.max(left.length, right.length, 1);
+    const svg = svgEl("svg", { width: 3 * boxW + 2 * colGap + 20,
+                               height: top + rows * (boxH + gap) + 12 });
+    const mid = { x: 10 + boxW + colGap, y: top + ((rows * (boxH + gap)) - gap) / 2 - boxH / 2 };
+    const cols = [
+      { items: left,  x: 10,                          label: "USED BY — WHO FEELS A CHANGE HERE" },
+      { items: right, x: mid.x + boxW + colGap,       label: "USES — WHAT IT CALLS OR READS" },
+    ];
+    for (const col of cols) {
+      svgEl("text", { x: col.x, y: 18, class: "col" }, svg).textContent = col.label;
+      col.items.forEach((n, i) => {
+        const y = top + i * (boxH + gap);
+        const g = svgEl("g", { class: "node " + kindClass(n.kind) }, svg);
+        if (n.ext) g.style.opacity = ".55";
+        svgEl("rect", { x: col.x, y, width: boxW, height: boxH,
+                        ...(n.ext ? { "stroke-dasharray": "4 3" } : {}) }, g);
+        const t = svgEl("text", { x: col.x + 7, y: y + 14 }, g);
+        t.textContent = n.name.length > 26 ? n.name.slice(0, 25) + "…" : n.name;
+        svgEl("text", { x: col.x + 7, y: y + 26, class: "mut" }, g).textContent =
+          (n.path || "").slice(0, 34);
+        if (!n.ext) g.addEventListener("click", () => run("what", `${n.path}::${n.name}`));
+        const isLeft = col.x === 10;
+        const x1 = isLeft ? col.x + boxW : mid.x + boxW;
+        const x2 = isLeft ? mid.x : col.x;
+        const yc = y + boxH / 2, mc = (x1 + x2) / 2;
+        svgEl("path", { class: "edge", "stroke-width": 1.2,
+          "stroke-dasharray": n.edge_kind === "reads" ? "5 3" : (n.ext ? "3 3" : ""),
+          d: `M ${x1} ${yc} C ${mc} ${yc}, ${mc} ${mid.y + boxH / 2}, ${x2} ${mid.y + boxH / 2}` }, svg);
+      });
+    }
+    const g = svgEl("g", { class: "node target" }, svg);
+    svgEl("rect", { x: mid.x, y: mid.y, width: boxW, height: boxH }, g);
+    svgEl("text", { x: mid.x + 7, y: mid.y + 19, class: "inv" }, g).textContent =
+      data.entity.name.length > 26 ? data.entity.name.slice(0, 25) + "…" : data.entity.name;
+    viz.appendChild(svg);
+  }
+
+  async function drawCard(arg) {
+    const data = await api(`/api/card?name=${encodeURIComponent(arg)}`);
+    if (!data.entity) {
+      $("#out").innerHTML = linkify(esc(`No entity matching '${arg}'. Try SEARCH — it forgives typos.`));
+      show("out");
+      return;
+    }
+    const e = data.entity;
+    const viz = $("#viz");
+    viz.innerHTML = "";
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML =
+      `<div class="head"><span class="nm ${kindClass(e.kind)}">${esc(e.name)}</span>` +
+      `<span class="pill">${esc(e.kind)}</span>` +
+      `<span class="where">${esc(e.path)} · line ${e.line}</span>` +
+      `<span class="prov" title="which recipe version mapped this">${esc(e.recipe)}@${esc(e.recipe_version)}</span></div>` +
+      (e.meta ? `<div class="says ${e.doc ? "" : "src"}">${e.doc ? "&ldquo;" + esc(e.meta.split("\n")[0]) + "&rdquo;"
+                 : esc(e.meta.split("\n")[0].slice(0, 100)) + " <small>(no docstring — showing its code)</small>"}</div>` : "");
+    cardSection(card, "used by — who feels a change here", data.incoming,
+      "nothing on the map calls this — tests, entry points, and dynamically-invoked functions look like this.");
+    cardSection(card, "uses — what it calls or reads", data.outgoing,
+      data.external.length ? "" : "nothing — it stands alone.");
+    if (data.external.length) {
+      const s = document.createElement("div");
+      s.className = "sect";
+      s.innerHTML = `<div class="sh">outside the map — stdlib, libraries, dynamic</div>` +
+        `<div class="chips">` + data.external.slice(0, 10).map(x => `<span class="chip ext">${esc(x)}</span>`).join("") +
+        (data.external.length > 10 ? `<span class="hintline">+${data.external.length - 10} more</span>` : "") + `</div>`;
+      card.appendChild(s);
+    }
+    viz.appendChild(card);
+    const capEl = document.createElement("div");
+    capEl.className = "caption";
+    capEl.textContent = "the local map · click any box to travel · BREAKS shows the full ripple";
+    viz.appendChild(capEl);
+    drawLocalMap(viz, data);
+    show("viz");
+  }
+
+  // ── search: forgiving, scored ────────────────────────────────────────
+  async function doSearch(q) {
+    setActive("what");
+    $("#arg").value = q;
+    const hits = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    const viz = $("#viz");
+    viz.innerHTML = "";
+    const capEl = document.createElement("div");
+    capEl.className = "caption";
+    capEl.textContent = hits.length
+      ? `${hits.length} match${hits.length === 1 ? "" : "es"} — scored: exact name, then fuzzy, then docstring words · click to open`
+      : `nothing matches '${q}' — the map covers code structure, not comments or strings`;
+    viz.appendChild(capEl);
+    for (const h of hits) {
+      const row = document.createElement("div");
+      row.className = "hit";
+      row.innerHTML = `<span class="sc">${h.score}</span>` +
+        `<span class="nm ${kindClass(h.kind)}">${esc(h.name)}</span>` +
+        `<span class="pt">${esc(h.path)}:${h.line}</span>` +
+        `<span class="mt">${esc((h.meta || "").split("\n")[0])}</span>`;
+      row.addEventListener("click", () => run("what", `${h.path}::${h.name}`));
+      viz.appendChild(row);
+    }
+    show("viz");
+  }
+
   // ── the ask loop ────────────────────────────────────────────────────
   async function run(v, arg) {
     setActive(v);
     $("#arg").value = arg;
+    if (v === "what" && arg) {
+      await drawCard(arg);
+      return;
+    }
     if (v === "map") {
       drawMap(await api("/api/graph"));
       show("viz");
@@ -585,9 +758,17 @@
     drawSettings();
     show("viz");
   });
-  $("#run").addEventListener("click", () => run(verb, $("#arg").value.trim()));
+  $("#run").addEventListener("click", () => {
+    const q = $("#arg").value.trim();
+    if (q) doSearch(q);
+  });
   $("#arg").addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter") run(verb, $("#arg").value.trim());
+    if (ev.key !== "Enter") return;
+    const q = $("#arg").value.trim();
+    if (!q) return;
+    // Enter searches; a verb tab click runs that verb on the text instead
+    if (q.includes("::")) run("what", q);
+    else doSearch(q);
   });
   $("#out").addEventListener("click", (ev) => {
     const l = ev.target.closest(".lnk");

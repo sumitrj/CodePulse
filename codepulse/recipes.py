@@ -41,6 +41,11 @@ class BindingRule:
 
 
 @dataclass(frozen=True)
+class DocRule:
+    query: str                       # @doc capture; attaches to the innermost enclosing entity
+
+
+@dataclass(frozen=True)
 class ReferenceRule:
     kind: str
     query: str
@@ -59,6 +64,7 @@ class Recipe:
     entities: tuple[EntityRule, ...] = ()
     bindings: tuple[BindingRule, ...] = ()
     references: tuple[ReferenceRule, ...] = ()
+    docs: tuple[DocRule, ...] = ()
 
 
 def compile_query(language_name: str, source: str) -> Query:
@@ -122,9 +128,10 @@ def load_recipe(path: Path) -> Recipe:
             )
             for r in data.get("references") or ()
         ),
+        docs=tuple(DocRule(query=d["query"]) for d in data.get("docs") or ()),
     )
 
-    for rule in (*recipe.entities, *recipe.bindings, *recipe.references):
+    for rule in (*recipe.entities, *recipe.bindings, *recipe.references, *recipe.docs):
         try:
             compile_query(recipe.language, rule.query)
         except Exception as exc:

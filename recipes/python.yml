@@ -1,7 +1,7 @@
 # Python recipe — parity with the hand-written extractor (specs/relationships/SPEC.md).
 # The engine knows none of this; a language is this file.
 name: python
-version: "3"
+version: "4"
 language: python
 matches: ["*.py"]
 module_suffix: ".py"
@@ -13,6 +13,12 @@ entities:
     query: "(class_definition name: (identifier) @name) @node"
   - kind: state
     query: "(module (assignment left: (identifier) @name) @node)"
+
+docs:
+  # docstrings attach to whichever entity encloses them
+  # (this grammar parses a docstring as a direct string child of the block)
+  - query: "(function_definition body: (block . (string (string_content) @doc)))"
+  - query: "(class_definition body: (block . (string (string_content) @doc)))"
 
 bindings:
   # import m

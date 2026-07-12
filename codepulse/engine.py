@@ -39,6 +39,8 @@ class Entity:
     line: int
     recipe: str
     recipe_version: str
+    meta: str = ""        # docstring when the recipe found one, else a slice of its own source
+    doc: bool = False     # True when meta came from a docs rule
 
 
 @dataclass(frozen=True)
@@ -63,11 +65,13 @@ EXCLUDE_DIRS = {
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS files(
-    path TEXT PRIMARY KEY, hash TEXT, recipe TEXT);
+    path TEXT PRIMARY KEY, hash TEXT, recipe TEXT, recipe_version TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS entities(
     path TEXT, name TEXT, kind TEXT, line INTEGER,
     recipe TEXT, recipe_version TEXT,
+    meta TEXT DEFAULT '', doc INTEGER DEFAULT 0,
     PRIMARY KEY(path, name));
+CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(path, name, meta);
 CREATE TABLE IF NOT EXISTS edges(
     id INTEGER PRIMARY KEY,
     src_path TEXT, src_name TEXT, kind TEXT, target TEXT,
@@ -99,8 +103,25 @@ class Engine:
         # one writer at a time by design; the panel server hands the engine
         # to its handler thread, so don't pin the connection to this one
         self.db = sqlite3.connect(db_path, check_same_thread=False)
+        self._migrate()
         self.db.executescript(_SCHEMA)
         self._compiled = {}
+
+    def _migrate(self) -> None:
+        """Older databases predate the meta/doc columns; add them in place."""
+        try:
+            columns = {row[1] for row in self.db.execute("PRAGMA table_info(entities)")}
+        except sqlite3.Error:
+            return
+        if columns and "meta" not in columns:
+            self.db.execute("ALTER TABLE entities ADD COLUMN meta TEXT DEFAULT ''")
+            self.db.execute("ALTER TABLE entities ADD COLUMN doc INTEGER DEFAULT 0")
+        try:
+            file_columns = {row[1] for row in self.db.execute("PRAGMA table_info(files)")}
+        except sqlite3.Error:
+            return
+        if file_columns and "recipe_version" not in file_columns:
+            self.db.execute("ALTER TABLE files ADD COLUMN recipe_version TEXT DEFAULT ''")
 
     # ── extraction ──────────────────────────────────────────────────────
 
@@ -111,19 +132,24 @@ class Engine:
         return self._extract(sorted(Path(p) for p in changed))
 
     def refresh(self) -> ApplyReport:
-        """The freshness primitive: re-extract hash-changed files, forget deleted ones."""
-        known = dict(self.db.execute("SELECT path, hash FROM files"))
+        """The freshness primitive: re-extract files whose content OR recipe
+        version changed (a better recipe re-maps history), forget deleted ones."""
+        known = {path: (digest, version) for path, digest, version in
+                 self.db.execute("SELECT path, hash, recipe_version FROM files")}
         on_disk = {}
         for path in self._scan():
             rel = path.relative_to(self.root).as_posix()
+            recipe = self._recipe_for(path)
             try:
-                on_disk[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+                on_disk[rel] = (hashlib.sha256(path.read_bytes()).hexdigest(),
+                                recipe.version if recipe else "")
             except OSError:
                 continue
-        changed = [self.root / rel for rel, digest in sorted(on_disk.items())
-                   if known.get(rel) != digest]
+        changed = [self.root / rel for rel, state in sorted(on_disk.items())
+                   if known.get(rel) != state]
         for rel in sorted(set(known) - set(on_disk)):
             self.db.execute("DELETE FROM entities WHERE path=?", (rel,))
+            self.db.execute("DELETE FROM entities_fts WHERE path=?", (rel,))
             self.db.execute("DELETE FROM edges WHERE src_path=?", (rel,))
             self.db.execute("DELETE FROM files WHERE path=?", (rel,))
         return self._extract(changed)
@@ -155,11 +181,14 @@ class Engine:
             except (OSError, UnicodeDecodeError, ValueError):
                 continue
             self.db.execute("DELETE FROM entities WHERE path=?", (rel,))
+            self.db.execute("DELETE FROM entities_fts WHERE path=?", (rel,))
             self.db.execute("DELETE FROM edges WHERE src_path=?", (rel,))
             self._extract_file(rel, source, recipe)
             self.db.execute(
-                "INSERT OR REPLACE INTO files(path, hash, recipe) VALUES(?,?,?)",
-                (rel, hashlib.sha256(source.encode()).hexdigest(), recipe.name),
+                "INSERT OR REPLACE INTO files(path, hash, recipe, recipe_version) "
+                "VALUES(?,?,?,?)",
+                (rel, hashlib.sha256(source.encode()).hexdigest(),
+                 recipe.name, recipe.version),
             )
             extracted.append(rel)
         self._resolve_all()
@@ -195,6 +224,7 @@ class Engine:
         spans = []          # (start, end, qualname) for src attribution
         stack = []          # enclosing entity spans
         seen = set()
+        placed = []         # (qual, kind, line, start, end, parent)
         for start, end, simple, kind, line in found:
             while stack and not (stack[-1][0] <= start and end <= stack[-1][1]):
                 stack.pop()
@@ -205,7 +235,24 @@ class Engine:
                 continue
             seen.add(qual)
             spans.append((start, end, qual))
-            self._insert_entity(rel, qual, kind, line, prov)
+            placed.append((qual, kind, line, start, end, parent))
+
+        # docs: attach each @doc capture to its innermost enclosing entity
+        docstrings: dict[str, str] = {}
+        for rule in recipe.docs:
+            for captures in run_matches(self._query(recipe, rule.query), root_node):
+                for doc_node in captures.get("doc") or []:
+                    owner = self._enclosing(spans, doc_node.start_byte)
+                    if owner != "<module>" and owner not in docstrings:
+                        docstrings[owner] = doc_node.text.decode().strip()[:400]
+
+        source_bytes = source.encode()
+        for qual, kind, line, start, end, parent in placed:
+            doc_text = docstrings.get(qual)
+            meta = doc_text if doc_text else \
+                source_bytes[start:end].decode(errors="ignore").strip()[:400]
+            self._insert_entity(rel, qual, kind, line, prov,
+                                meta=meta, doc=doc_text is not None)
             self._insert_edge(rel, parent or "<module>", "contains", "", line,
                               dst=(rel, qual), meta="{}", prov=prov)
 
@@ -258,11 +305,16 @@ class Engine:
                 best = (end - start, qual)
         return best[1] if best else "<module>"
 
-    def _insert_entity(self, path, name, kind, line, prov):
+    def _insert_entity(self, path, name, kind, line, prov, meta="", doc=False):
         self.db.execute(
-            "INSERT OR IGNORE INTO entities(path,name,kind,line,recipe,recipe_version) "
-            "VALUES(?,?,?,?,?,?)", (path, name, kind, line, *prov),
+            "INSERT OR IGNORE INTO entities(path,name,kind,line,recipe,recipe_version,meta,doc) "
+            "VALUES(?,?,?,?,?,?,?,?)", (path, name, kind, line, *prov, meta, int(doc)),
         )
+        if name != "<module>":
+            self.db.execute(
+                "INSERT INTO entities_fts(path,name,meta) VALUES(?,?,?)",
+                (path, name, meta),
+            )
 
     def _insert_edge(self, path, src, kind, target, line, meta, prov, dst=None):
         dst_path, dst_name, status = None, None, "raw"
@@ -424,14 +476,16 @@ class Engine:
     # ── reads ───────────────────────────────────────────────────────────
 
     def entities(self, path: str | None = None) -> list[Entity]:
-        sql = "SELECT path,name,kind,line,recipe,recipe_version FROM entities"
+        sql = "SELECT path,name,kind,line,recipe,recipe_version,meta,doc FROM entities"
         args: tuple = ()
         if path is not None:
             sql += " WHERE path=?"
             args = (path,)
+        rows = sorted(self.db.execute(sql, args),
+                      key=lambda r: tuple("" if v is None else v for v in r[:2]))
         return [
-            Entity(Addr(p, n), k, l, r, v)
-            for p, n, k, l, r, v in sorted(self.db.execute(sql, args))
+            Entity(Addr(p, n), k, l, r, v, meta=m or "", doc=bool(d))
+            for p, n, k, l, r, v, m, d in rows
         ]
 
     def outgoing(self, src: Addr, kind: str | None = None) -> list[Edge]:
