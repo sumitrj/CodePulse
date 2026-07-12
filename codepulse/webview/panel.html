@@ -1,38 +1,83 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="white" data-color="mono" data-font="system" data-size="m">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CodePulse</title>
 <style>
-  :root {
-    --ink:  #111;
-    --paper:#fff;
-    --mut:  #666;
-    --soft: #e6e6e6;
-    --hush: #f6f6f6;
+  /* ── tokens: two GitHub-code-theme parallels, one ink one paper ── */
+  :root, [data-theme="white"] {
+    --paper: #ffffff;
+    --ink:   #1f2328;
+    --mut:   #656d76;
+    --soft:  #d0d7de;
+    --hush:  #f6f8fa;
+    --k-fn:  #8250df;   /* function, method */
+    --k-cls: #953800;   /* class, stage */
+    --k-st:  #cf222e;   /* state */
+    --k-key: #0550ae;   /* key, variable, output */
+    --k-res: #116329;   /* resource */
   }
+  [data-theme="black"] {
+    --paper: #0d1117;
+    --ink:   #e6edf3;
+    --mut:   #8b949e;
+    --soft:  #30363d;
+    --hush:  #161b22;
+    --k-fn:  #d2a8ff;
+    --k-cls: #ffa657;
+    --k-st:  #ff7b72;
+    --k-key: #79c0ff;
+    --k-res: #7ee787;
+  }
+  :root { --fs: 15px; --fs-mono: 13px; --fs-small: 12px;
+          --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          --mono: ui-monospace, Menlo, Consolas, monospace; }
+  [data-size="s"] { --fs: 13px; --fs-mono: 11.5px; --fs-small: 11px; }
+  [data-size="l"] { --fs: 17px; --fs-mono: 14.5px; --fs-small: 13px; }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font: var(--fs)/1.5 var(--sans);
     color: var(--ink); background: var(--paper);
     display: flex; flex-direction: column;
   }
-  code, pre, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  [data-font="mono"] body { font-family: var(--mono); }
+  code, pre, .mono { font-family: var(--mono); font-size: var(--fs-mono); }
+
+  /* ── entity-kind color coding (only when COLOR: BY KIND) ── */
+  [data-color="kind"] .k-function, [data-color="kind"] .k-method   { color: var(--k-fn); }
+  [data-color="kind"] .k-class,    [data-color="kind"] .k-stage    { color: var(--k-cls); }
+  [data-color="kind"] .k-state                                     { color: var(--k-st); }
+  [data-color="kind"] .k-key, [data-color="kind"] .k-variable,
+  [data-color="kind"] .k-output                                    { color: var(--k-key); }
+  [data-color="kind"] .k-resource                                  { color: var(--k-res); }
+  [data-color="kind"] svg g.k-function rect, [data-color="kind"] svg g.k-method rect { stroke: var(--k-fn); }
+  [data-color="kind"] svg g.k-class rect,    [data-color="kind"] svg g.k-stage rect  { stroke: var(--k-cls); }
+  [data-color="kind"] svg g.k-state rect                                             { stroke: var(--k-st); }
+  [data-color="kind"] svg g.k-key rect, [data-color="kind"] svg g.k-variable rect,
+  [data-color="kind"] svg g.k-output rect                                            { stroke: var(--k-key); }
+  [data-color="kind"] svg g.k-resource rect                                          { stroke: var(--k-res); }
 
   header {
-    display: flex; align-items: baseline; gap: 14px;
-    padding: 10px 14px; border-bottom: 1.5px solid var(--ink);
+    display: flex; align-items: center; gap: 14px;
+    padding: 8px 14px; border-bottom: 1.5px solid var(--ink);
   }
-  header h1 { font-size: 15px; font-weight: 700; letter-spacing: .08em; }
-  #stats { margin-left: auto; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--mut); }
+  header h1 { font-size: var(--fs); font-weight: 700; letter-spacing: .08em; }
+  #stats { margin-left: auto; font-size: var(--fs-small); text-transform: uppercase; letter-spacing: .05em; color: var(--mut); }
+  #cog {
+    border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink);
+    padding: 4px 12px; font: inherit; font-size: var(--fs-small); text-transform: uppercase;
+    letter-spacing: .05em; cursor: pointer;
+  }
+  #cog:hover, #cog.active { background: var(--ink); color: var(--paper); }
 
   #ask { display: flex; border-bottom: 1.5px solid var(--ink); }
   .tabs { display: flex; }
   .tabs button {
     border: 0; border-right: 1px solid var(--soft); background: var(--paper);
-    padding: 8px 12px; font: inherit; font-size: 12px; text-transform: uppercase;
+    padding: 8px 12px; font: inherit; font-size: var(--fs-small); text-transform: uppercase;
     letter-spacing: .05em; color: var(--ink); cursor: pointer; white-space: nowrap;
   }
   .tabs button.active { background: var(--ink); color: var(--paper); }
@@ -42,8 +87,8 @@
   }
   #arg:focus { outline: none; background: var(--hush); }
   #run {
-    border: 0; border-left: 1.5px solid var(--ink); background: var(--paper);
-    padding: 8px 16px; font: inherit; font-size: 12px; text-transform: uppercase;
+    border: 0; border-left: 1.5px solid var(--ink); background: var(--paper); color: var(--ink);
+    padding: 8px 16px; font: inherit; font-size: var(--fs-small); text-transform: uppercase;
     letter-spacing: .05em; cursor: pointer;
   }
   #run:hover { background: var(--ink); color: var(--paper); }
@@ -53,22 +98,21 @@
   #rail .file { border-bottom: 1px solid var(--soft); }
   #rail summary {
     padding: 6px 10px; cursor: pointer; list-style: none;
-    font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 12px; color: var(--mut);
+    font-family: var(--mono); font-size: var(--fs-small); color: var(--mut);
   }
   #rail summary::-webkit-details-marker { display: none; }
   #rail details[open] summary { color: var(--ink); font-weight: 600; }
   #rail .ent {
     display: flex; gap: 8px; padding: 3px 10px 3px 20px; cursor: pointer;
-    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    font-family: var(--mono); font-size: var(--fs-small);
   }
   #rail .ent:hover { background: var(--ink); color: var(--paper); }
-  #rail .ent .kind { margin-left: auto; color: var(--mut); font-size: 11px; }
+  #rail .ent .kind { margin-left: auto; color: var(--mut); font-size: calc(var(--fs-small) - 1px); }
   #rail .ent:hover .kind { color: var(--paper); }
 
   #stage { flex: 1; overflow: auto; padding: 14px; }
   #out {
-    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+    font-family: var(--mono); font-size: var(--fs-mono);
     background: var(--hush); border: 1px solid var(--soft);
     padding: 12px; white-space: pre-wrap; word-break: break-word; min-height: 120px;
   }
@@ -78,34 +122,50 @@
 
   #viz { overflow: auto; }
   #viz .caption {
-    font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+    font-size: var(--fs-small); text-transform: uppercase; letter-spacing: .05em;
     color: var(--mut); margin-bottom: 8px;
   }
   svg { display: block; }
-  svg text { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; fill: var(--ink); }
-  svg text.mut { fill: var(--mut); font-size: 10px; }
-  svg text.col { fill: var(--mut); font-size: 11px; letter-spacing: .05em; }
+  svg text { font-family: var(--mono); font-size: var(--fs-small); fill: var(--ink); }
+  svg text.mut { fill: var(--mut); font-size: calc(var(--fs-small) - 2px); }
+  svg text.col { fill: var(--mut); font-size: calc(var(--fs-small) - 1px); letter-spacing: .05em; }
   svg text.inv { fill: var(--paper); }
-  svg .node { cursor: pointer; }
+  svg .node { cursor: pointer; transition: opacity .15s; }
   svg .node rect { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
   svg .node.target rect { fill: var(--ink); }
   svg .node:hover rect { fill: var(--ink); }
   svg .node:hover text { fill: var(--paper); }
-  svg path.edge { fill: none; stroke: #c2c2c2; }
+  svg path.edge { fill: none; stroke: var(--soft); transition: opacity .15s; }
   svg path.edge.hot { stroke: var(--ink); }
+  svg .dim { opacity: .18; }
 
-  table { border-collapse: collapse; font-size: 13px; width: 100%; }
+  table { border-collapse: collapse; font-size: var(--fs-mono); width: 100%; }
   th { background: var(--hush); font-weight: 600; }
   th, td { border: 1px solid var(--soft); padding: 5px 8px; text-align: left; }
-  th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
-  td.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
-  td.n { text-align: right; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  th { font-size: calc(var(--fs-small) - 1px); text-transform: uppercase; letter-spacing: .05em; }
+  td.mono { font-family: var(--mono); font-size: var(--fs-small); }
+  td.n { text-align: right; font-family: var(--mono); font-size: var(--fs-small); }
   tbody tr { cursor: pointer; }
-  tbody tr:hover td { background: var(--ink); color: var(--paper); }
+  tbody tr:hover td { background: var(--ink); color: var(--paper) !important; }
+
+  /* ── settings: four rows, segmented, instant ── */
+  #viz .setrow { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--soft); }
+  #viz .setrow .lbl {
+    width: 90px; font-size: var(--fs-small); text-transform: uppercase;
+    letter-spacing: .05em; color: var(--mut);
+  }
+  .seg { display: inline-flex; border: 1.5px solid var(--ink); }
+  .seg button {
+    border: 0; border-right: 1px solid var(--soft); background: var(--paper); color: var(--ink);
+    padding: 6px 16px; font: inherit; font-size: var(--fs-small); text-transform: uppercase;
+    letter-spacing: .05em; cursor: pointer;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button.on { background: var(--ink); color: var(--paper); }
 
   footer {
     padding: 6px 14px; border-top: 1.5px solid var(--ink);
-    font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--mut);
+    font-size: var(--fs-small); text-transform: uppercase; letter-spacing: .05em; color: var(--mut);
   }
 
   @media (max-width: 700px) {   /* editor sidebar: the answer is the panel */
@@ -118,6 +178,7 @@
   <header>
     <h1>CODEPULSE</h1>
     <span id="stats">&nbsp;</span>
+    <button id="cog">Settings</button>
   </header>
 
   <div id="ask">
@@ -152,6 +213,75 @@
 
   const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const api = async (url) => (await fetch(url)).json();
+  const kindClass = (k) => k ? "k-" + k.replace(/[^\w-]/g, "") : "";
+
+  // ── settings: the moat is this staying small ────────────────────────
+  const DEFAULTS = { theme: "white", color: "mono", font: "system", size: "m" };
+  let settings = { ...DEFAULTS };
+  try { Object.assign(settings, JSON.parse(localStorage.getItem("pulse") || "{}")); } catch (e) {}
+
+  function applySettings() {
+    const root = document.documentElement;
+    for (const k of ["theme", "color", "font", "size"]) root.dataset[k] = settings[k];
+    try { localStorage.setItem("pulse", JSON.stringify(settings)); } catch (e) {}
+  }
+
+  const SETTING_ROWS = [
+    ["theme", "First color", [["white", "White first"], ["black", "Black first"]]],
+    ["color", "Entities",    [["mono", "Mono"], ["kind", "By kind"]]],
+    ["font",  "Font",        [["system", "System"], ["mono", "Mono"]]],
+    ["size",  "Size",        [["s", "S"], ["m", "M"], ["l", "L"]]],
+  ];
+
+  function drawSettings() {
+    const viz = $("#viz");
+    viz.innerHTML = "";
+    const cap = document.createElement("div");
+    cap.className = "caption";
+    cap.textContent = "four choices · instant · saved on this machine";
+    viz.appendChild(cap);
+    for (const [key, label, options] of SETTING_ROWS) {
+      const row = document.createElement("div");
+      row.className = "setrow";
+      const lbl = document.createElement("span");
+      lbl.className = "lbl";
+      lbl.textContent = label;
+      row.appendChild(lbl);
+      const seg = document.createElement("div");
+      seg.className = "seg";
+      for (const [value, text] of options) {
+        const b = document.createElement("button");
+        b.textContent = text;
+        b.classList.toggle("on", settings[key] === value);
+        b.addEventListener("click", () => {
+          settings[key] = value;
+          applySettings();
+          drawSettings();
+        });
+        seg.appendChild(b);
+      }
+      row.appendChild(seg);
+      viz.appendChild(row);
+    }
+    const row = document.createElement("div");
+    row.className = "setrow";
+    const lbl = document.createElement("span");
+    lbl.className = "lbl";
+    lbl.textContent = " ";
+    row.appendChild(lbl);
+    const seg = document.createElement("div");
+    seg.className = "seg";
+    const b = document.createElement("button");
+    b.textContent = "Defaults";
+    b.addEventListener("click", () => {
+      settings = { ...DEFAULTS };
+      applySettings();
+      drawSettings();
+    });
+    seg.appendChild(b);
+    row.appendChild(seg);
+    viz.appendChild(row);
+  }
 
   function linkify(t) {
     return t.replace(
@@ -162,6 +292,7 @@
 
   function setActive(v) {
     verb = v;
+    $("#cog").classList.remove("active");
     document.querySelectorAll("#tabs button").forEach(
       (b) => b.classList.toggle("active", b.dataset.v === v)
     );
@@ -186,6 +317,37 @@
     return "";
   }
 
+  // ── focus mode: click a node, the rest steps back ───────────────────
+  function focusable(svg, nodeEls, edgeRecs) {
+    // nodeEls: Map(id -> <g>), edgeRecs: [{el, a, b}]
+    let focused = null;
+    function apply() {
+      const neighbors = new Set();
+      if (focused) {
+        neighbors.add(focused);
+        for (const e of edgeRecs) {
+          if (e.a === focused) neighbors.add(e.b);
+          if (e.b === focused) neighbors.add(e.a);
+        }
+      }
+      for (const [id, g] of nodeEls) {
+        g.classList.toggle("dim", focused !== null && !neighbors.has(id));
+      }
+      for (const e of edgeRecs) {
+        const on = focused !== null && (e.a === focused || e.b === focused);
+        e.el.classList.toggle("hot", on);
+        e.el.classList.toggle("dim", focused !== null && !on);
+      }
+    }
+    svg.addEventListener("click", (ev) => {
+      if (ev.target === svg) { focused = null; apply(); }
+    });
+    return (id) => {
+      focused = focused === id ? null : id;
+      apply();
+    };
+  }
+
   // ── BREAKS / REACH: the hop diagram ─────────────────────────────────
   function drawRadius(data) {
     const viz = $("#viz");
@@ -199,56 +361,65 @@
     cap.textContent = data.nodes.length
       ? `${head} ${data.target.path} :: ${data.target.name} — ` +
         `${data.nodes.length} ${what}, ${hops} hop${hops === 1 ? "" : "s"} deep · ` +
-        `solid calls · dashed reads · dotted inherits · click to re-center`
+        `click to focus · double-click to re-center · solid calls, dashed reads, dotted inherits`
       : `${head} ${data.target.path} :: ${data.target.name} — ` +
         (out ? "calls nothing on the map." : "nothing depends on it.");
     viz.appendChild(cap);
 
-    const byHop = new Map([[0, [{ path: data.target.path, name: data.target.name, hop: 0 }]]]);
+    const byHop = new Map([[0, [{ path: data.target.path, name: data.target.name, hop: 0, kind: "" }]]]);
     for (const n of data.nodes) {
       if (!byHop.has(n.hop)) byHop.set(n.hop, []);
       byHop.get(n.hop).push(n);
     }
     const colW = 280, boxW = 230, boxH = 34, gap = 10, top = 44;
     const pos = new Map();
+    const nodeEls = new Map();
     const rows = Math.max(...[...byHop.values()].map(c => c.length));
     const svg = svgEl("svg", {
       width: byHop.size * colW + 40,
       height: top + rows * (boxH + gap) + 20,
     });
-
     const edgeLayer = svgEl("g", {}, svg);
+
+    let focus = null;   // assigned after edges exist
     for (const [hop, col] of [...byHop.entries()].sort((a, b) => a[0] - b[0])) {
       const x = 20 + hop * colW;
       svgEl("text", { x, y: 24, class: "col" }, svg).textContent =
         hop === 0 ? "TARGET" : `${hop} HOP${hop === 1 ? "" : "S"}`;
       col.forEach((n, i) => {
         const y = top + i * (boxH + gap);
-        const g = svgEl("g", { class: "node" + (n.hop === 0 ? " target" : "") }, svg);
+        const id = `${n.path}::${n.name}`;
+        const g = svgEl("g", {
+          class: ["node", n.hop === 0 ? "target" : "", kindClass(n.kind)].join(" ").trim(),
+        }, svg);
         svgEl("rect", { x, y, width: boxW, height: boxH }, g);
         const t1 = svgEl("text", { x: x + 8, y: y + 15, class: n.hop === 0 ? "inv" : "" }, g);
         t1.textContent = n.name.length > 30 ? n.name.slice(0, 29) + "…" : n.name;
         const t2 = svgEl("text", { x: x + 8, y: y + 28, class: "mut" + (n.hop === 0 ? " inv" : "") }, g);
         t2.textContent = n.path;
-        g.addEventListener("click", () => {
-          if (n.hop === 0) run("what", `${n.path}::${n.name}`);
-          else runRadius(`${n.path}::${n.name}`, data.direction);
+        g.addEventListener("click", (ev) => { ev.stopPropagation(); focus(id); });
+        g.addEventListener("dblclick", () => {
+          if (n.hop === 0) run("what", id);
+          else runRadius(id, data.direction);
         });
-        pos.set(`${n.path}::${n.name}`, { x, y, hop: n.hop });
+        pos.set(id, { x, y, hop: n.hop });
+        nodeEls.set(id, g);
       });
     }
+    const edgeRecs = [];
     for (const e of data.edges) {
       const a = pos.get(e.src), b = pos.get(e.dst);
       if (!a || !b) continue;
-      // draw left-to-right: from the lower-hop box's right edge to the higher-hop box's left edge
       const from = a.hop <= b.hop ? a : b, to = a.hop <= b.hop ? b : a;
       const x1 = from.x + boxW, y1 = from.y + boxH / 2, x2 = to.x, y2 = to.y + boxH / 2;
       const mid = (x1 + x2) / 2;
-      svgEl("path", {
+      const p = svgEl("path", {
         class: "edge", d: `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`,
         "stroke-dasharray": edgeDash(e.kind), "stroke-width": 1.2,
       }, edgeLayer);
+      edgeRecs.push({ el: p, a: e.src, b: e.dst });
     }
+    focus = focusable(svg, nodeEls, edgeRecs);
     viz.appendChild(svg);
   }
 
@@ -273,7 +444,7 @@
     const cap = document.createElement("div");
     cap.className = "caption";
     cap.textContent = `the whole map · ${data.nodes.length} ${data.mode === "file" ? "files" : "directories"}` +
-      ` · edges are cross-file references, thicker = more · click a box to inspect`;
+      ` · click to focus · double-click to inspect · thicker edge = more references`;
     viz.appendChild(cap);
 
     const cols = new Map();
@@ -291,26 +462,28 @@
     });
     const edgeLayer = svgEl("g", {}, svg);
     const pos = new Map();
+    const nodeEls = new Map();
 
+    let focus = null;
     for (const [depth, col] of [...cols.entries()].sort((a, b) => a[0] - b[0])) {
       const x = 20 + depth * colW;
       col.forEach((n, i) => {
         const y = top + i * (boxH + gap);
-        const g = svgEl("g", { class: "node", "data-id": n.id }, svg);
+        const g = svgEl("g", { class: "node" }, svg);
         svgEl("rect", { x, y, width: boxW, height: boxH }, g);
         const label = n.id.length > 26 ? "…" + n.id.slice(-25) : n.id;
         svgEl("text", { x: x + 6, y: y + 16 }, g).textContent = label;
         const badge = svgEl("text", { x: x + boxW - 6, y: y + 16, class: "mut", "text-anchor": "end" }, g);
         badge.textContent = String(n.entities);
-        g.addEventListener("mouseenter", () => hot(n.id, true));
-        g.addEventListener("mouseleave", () => hot(n.id, false));
+        g.addEventListener("click", (ev) => { ev.stopPropagation(); focus(n.id); });
         if (data.mode === "file") {
-          g.addEventListener("click", () => run("what", `${n.id}::<module>`));
+          g.addEventListener("dblclick", () => run("what", `${n.id}::<module>`));
         }
         pos.set(n.id, { x, y });
+        nodeEls.set(n.id, g);
       });
     }
-    const hotEdges = new Map();
+    const edgeRecs = [];
     for (const e of data.edges) {
       const a = pos.get(e.src), b = pos.get(e.dst);
       if (!a || !b) continue;
@@ -321,14 +494,9 @@
         d: `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`,
         "stroke-width": Math.min(1 + Math.log2(e.n), 4).toFixed(1),
       }, edgeLayer);
-      for (const id of [e.src, e.dst]) {
-        if (!hotEdges.has(id)) hotEdges.set(id, []);
-        hotEdges.get(id).push(p);
-      }
+      edgeRecs.push({ el: p, a: e.src, b: e.dst });
     }
-    function hot(id, on) {
-      for (const p of hotEdges.get(id) || []) p.classList.toggle("hot", on);
-    }
+    focus = focusable(svg, nodeEls, edgeRecs);
     viz.appendChild(svg);
   }
 
@@ -339,7 +507,7 @@
     const cap = document.createElement("div");
     cap.className = "caption";
     cap.textContent = `estimated ${list.length} handler-level function${list.length === 1 ? "" : "s"}` +
-      ` — uncalled roots with downstream reach · click one to see its blast radius`;
+      ` — uncalled roots with downstream reach · click one to see its reach`;
     viz.appendChild(cap);
     if (!list.length) return;
     const table = document.createElement("table");
@@ -347,7 +515,7 @@
     const tbody = document.createElement("tbody");
     for (const h of list) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td class="mono">${esc(h.name)}</td><td class="mono">${esc(h.path)}</td>` +
+      tr.innerHTML = `<td class="mono ${kindClass(h.kind)}">${esc(h.name)}</td><td class="mono">${esc(h.path)}</td>` +
         `<td class="n">${h.reach}</td><td class="n">${h.direct}</td>`;
       tr.addEventListener("click", () => runRadius(`${h.path}::${h.name}`, "out"));
       tbody.appendChild(tr);
@@ -394,7 +562,8 @@
       for (const e of f.entities) {
         const row = document.createElement("div");
         row.className = "ent";
-        row.innerHTML = `<span>${esc(e.name)}</span><span class="kind">${esc(e.kind)}</span>`;
+        row.innerHTML = `<span class="${kindClass(e.kind)}">${esc(e.name)}</span>` +
+          `<span class="kind">${esc(e.kind)}</span>`;
         row.addEventListener("click", () => run("what", `${f.path}::${e.name}`));
         d.appendChild(row);
       }
@@ -410,6 +579,12 @@
     else if ($("#arg").value.trim()) run(v, $("#arg").value.trim());
     else { setActive(v); $("#arg").focus(); }
   });
+  $("#cog").addEventListener("click", () => {
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.remove("active"));
+    $("#cog").classList.add("active");
+    drawSettings();
+    show("viz");
+  });
   $("#run").addEventListener("click", () => run(verb, $("#arg").value.trim()));
   $("#arg").addEventListener("keydown", (ev) => {
     if (ev.key === "Enter") run(verb, $("#arg").value.trim());
@@ -420,6 +595,7 @@
   });
   window.addEventListener("focus", loadTree);
 
+  applySettings();
   loadTree().then(() => run("map", ""));
 </script>
 </body>

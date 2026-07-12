@@ -96,8 +96,9 @@ def radius_graph(engine: Engine, name: str, direction: str = "in") -> dict:
     else:
         depth_of = six.compute_radius(engine, target)
     members = {target} | set(depth_of)
+    kinds = {e.addr: e.kind for e in engine.entities()}
     nodes = [
-        {"path": addr.path, "name": addr.name, "hop": hop}
+        {"path": addr.path, "name": addr.name, "hop": hop, "kind": kinds.get(addr, "")}
         for addr, hop in sorted(depth_of.items(), key=lambda kv: (kv[1], kv[0].path, kv[0].name))
     ]
     kinds = ("calls",) if direction == "out" else _IMPACT
