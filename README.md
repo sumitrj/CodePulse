@@ -8,19 +8,26 @@ seconds of a save.
 Languages are **recipes**, not code: a YAML file of tree-sitter queries adds a
 language. Six ship today: Python, TypeScript, YAML, Dockerfile, Terraform, HTML.
 
-## Install (one command per repo)
+## Install
 
 ```sh
-git clone <this repo> && cd CodePulse
-uv sync                                # once
-./setup.sh /path/to/your/repo          # per repo you want mapped
+git clone <this repo>
+uv tool install ./CodePulse            # once: puts `codepulse` on your PATH
 ```
 
-`setup.sh` does everything: registers the MCP server in the repo's
-`.mcp.json`, installs the Claude Code skill at `.claude/skills/codepulse/`,
-builds the map (`.codepulse/pulse.db`, kept out of git automatically), and is
-safe to re-run. Then open Claude Code in that repo and approve the
-`codepulse` server when prompted. That's the whole setup.
+## Use (one word per repo)
+
+```sh
+cd /path/to/your/repo
+codepulse .                            # wire + build the map + start the panel
+```
+
+That one command registers the MCP server in the repo's `.mcp.json`, installs
+the Claude Code skill, builds the map with live progress (`.codepulse/`, kept
+out of git automatically), and serves the panel. Re-running it is always safe.
+Then open Claude Code in the repo and approve the `codepulse` server when
+prompted. `codepulse . --no-panel` wires without the panel; a
+`.codepulse/ignore` file (one directory name per line) scopes huge repos.
 
 **Prove it to yourself:** [demo/benchmark.md](demo/benchmark.md) — same five
 questions with and without the map; you score time, tokens, and accuracy from

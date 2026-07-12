@@ -61,6 +61,8 @@ class ApplyReport:
 EXCLUDE_DIRS = {
     ".git", ".venv", "venv", "env", "node_modules", "__pycache__",
     ".pytest_cache", "dist", "build", ".codepulse", ".claude",
+    ".tox", ".mypy_cache", ".ruff_cache", ".terraform", ".ipynb_checkpoints",
+    "site-packages", "target", "vendor",
 }
 
 _SCHEMA = """
@@ -106,6 +108,14 @@ class Engine:
         self._migrate()
         self.db.executescript(_SCHEMA)
         self._compiled = {}
+        self.progress = None          # optional callable(done, total) for long indexes
+        self._excludes = set(EXCLUDE_DIRS)
+        ignore = self.root / ".codepulse" / "ignore"
+        if ignore.is_file():          # repo-owner scoping: one directory name per line
+            self._excludes |= {
+                line.strip().rstrip("/") for line in ignore.read_text().splitlines()
+                if line.strip() and not line.startswith("#")
+            }
 
     def _migrate(self) -> None:
         """Older databases predate the meta/doc columns; add them in place."""
@@ -158,7 +168,7 @@ class Engine:
         return sorted(
             p for p in self.root.rglob("*")
             if p.is_file()
-            and not any(part in EXCLUDE_DIRS for part in p.relative_to(self.root).parts)
+            and not any(part in self._excludes for part in p.relative_to(self.root).parts)
             and self._recipe_for(p) is not None
         )
 
@@ -170,7 +180,10 @@ class Engine:
 
     def _extract(self, paths) -> ApplyReport:
         extracted = []
-        for path in paths:
+        paths = list(paths)
+        for index, path in enumerate(paths):
+            if self.progress and index and index % 200 == 0:
+                self.progress(index, len(paths))
             abs_path = path if path.is_absolute() else self.root / path
             recipe = self._recipe_for(abs_path)
             if recipe is None:
