@@ -1,83 +1,100 @@
 # CodePulse
 
-A system of record for code as capabilities, not files. Every unit of logic gets an
-identity, a promise, a version, and a map of dependents — so agents and humans stop
-re-deriving structure and nothing changes silently.
+One live map of your repo — every function, class, config key, Terraform
+variable, and Dockerfile edge, across languages — read by you in an editor
+panel and by your agents over MCP. Same map, same answers, fresh within
+seconds of a save.
 
-## What exists (V1 core)
+Languages are **recipes**, not code: a YAML file of tree-sitter queries adds a
+language. Six ship today: Python, TypeScript, YAML, Dockerfile, Terraform, HTML.
 
-| Piece | Module | Status |
-|---|---|---|
-| Unit extraction (Python) | `codepulse.identity.extract` | 15/15 tests green |
-| Identity fingerprint + 3-tier matcher | `codepulse.identity` | rename, move, refactor, split all survive |
-| Relationship pipeline (6 edge kinds, cross-file resolution) | `codepulse.relationships` | 15/15 tests green |
-| The Judge (refactor/patch/minor/major, Claude-backed) | `codepulse.judge` | mechanical + model + paranoid heuristic |
-| Graph of record (persisted, identity-preserving refresh) | `codepulse.store` | `.codepulse/store.json` per repo |
-| The six verbs (shared by CLI, MCP, hooks) | `codepulse.verbs` | what / who / radius / changed / locate / map |
-| CLI | `codepulse.cli` via `pulse.py` | `index`, all verbs, `install-hooks`, `serve-mcp` |
-| MCP server (stdio JSON-RPC, stdlib only) | `codepulse.mcp_server` | 6 tools: `pulse_what` ... `pulse_map` |
-| Claude Code hooks (push surface) | `cli.cmd_hook_pre/post` | pre-edit context injection + post-edit MAJOR verification |
-| Companion app (Material 3) | `codepulse.app` + `webapp/` | Silhouette / Explore / Ripple / Changes / Workbench |
-| The Workbench (issue -> workpiece) | `codepulse.workbench` | brief, gate, isolated execute, radius-proved, versioned artifacts, GitHub via `gh` |
-| Configurables (one source of truth) | `codepulse.config` + Settings view | scope/gate/judge/hooks/freshness, load-bearing, owner-tagged |
-
-## Configurables
-
-Every control point lives in `.codepulse/config.json`, read live by the scanner (scope),
-the Workbench (gate + judge), and the hooks (injection). Edit it three ways:
+## Install (one command per repo)
 
 ```sh
-python3 pulse.py config                       # view all knobs, grouped by owner
-python3 pulse.py config --set gate.max_radius=15
-# or the Settings view in the companion app (Material 3 switches/sliders/selects/chips)
+git clone <this repo> && cd CodePulse
+uv sync                                # once
+./setup.sh /path/to/your/repo          # per repo you want mapped
 ```
 
-Knobs marked *display-only* are surfaced but not yet enforced (e.g. granularity, cadence);
-everything else changes behavior the moment it's saved.
+`setup.sh` does everything: registers the MCP server in the repo's
+`.mcp.json`, installs the Claude Code skill at `.claude/skills/codepulse/`,
+builds the map (`.codepulse/pulse.db`, kept out of git automatically), and is
+safe to re-run. Then open Claude Code in that repo and approve the
+`codepulse` server when prompted. That's the whole setup.
 
-## The Workbench
+**Prove it to yourself:** [demo/benchmark.md](demo/benchmark.md) — same five
+questions with and without the map; you score time, tokens, and accuracy from
+your own screen.
+
+## What your agent gets (MCP + skill)
+
+Seven tools, plain-sentence answers:
+
+| Tool | Question |
+|---|---|
+| `pulse_map` | Repo silhouette: size, load-bearing entities |
+| `pulse_what` | What is this? Card: kind, line, calls, dependents |
+| `pulse_who` | Who touches it? All incoming edges |
+| `pulse_radius` | What breaks if I change it? Transitive, by hops |
+| `pulse_changed` | What did my diff touch, and who's at risk? |
+| `pulse_locate` | Where does X live? |
+| `pulse_handlers` | Estimated entry points (uncalled roots with reach) |
+
+The installed skill teaches Claude to ask the map before grepping — an
+architecture overview is two tool calls, not forty file reads.
+
+## What you get (the panel)
 
 ```sh
-python3 pulse.py brief 123                    # issue -> map-scoped brief + gate decision
-python3 pulse.py work 123                     # hands-free: headless Claude works it, radius-tested, PR-ready
-python3 pulse.py work 123 --live              # push branch, open PR, comment on the issue
+.venv/bin/python -m codepulse.panel --root /path/to/your/repo --port 7319
 ```
 
-Every run produces a versioned **workpiece** (`.codepulse/workpieces/<n>/vN.json`): Brief,
-Change, Proof, Verdict, Trace. The gate escalates to a human when blast radius, fan-in, or
-confidence exceed policy. The promise-test invariant auto-rejects any MAJOR verdict that
-ships without a test change: when a promise moves, a test must move.
+Or install [extension/codepulse-0.1.0.vsix](extension/) in VS Code / Cursor /
+Antigravity (activity bar → pulse icon; set `codepulse.python` to this repo's
+`.venv/bin/python`). The panel is the same seven questions rendered visually:
+the whole map layered by dependency depth, blast radius as hop columns,
+click-to-focus, a handlers board. Settings are four rows — theme, entity
+colors, font, size — instant, done.
 
-## Use it on a repo
+## Cross-language edges — the point
 
-```sh
-python3 pulse.py --root /path/to/repo index          # build the map
-python3 pulse.py --root /path/to/repo what get_env   # verb 1
-python3 pulse.py --root /path/to/repo radius get_env # verb 3
-python3 pulse.py --root /path/to/repo install-hooks  # Claude Code: map arrives before every edit
-# MCP (project-scoped): add codepulse to the repo's .mcp.json pointing at `pulse.py serve-mcp`
+`COPY app.py` in a Dockerfile points at the Python module. `<script src>`
+points at the TypeScript file. `os.environ["DB_URL"]` in Python reaches
+`variable "DB_URL"` in Terraform. Blast radius walks all of it — the edges no
+single-language tool can see.
+
+The map is honest: it only claims what it can prove. Dynamic dispatch and
+string-built references don't get invented edges; the skill teaches agents to
+say so instead of guessing.
+
+## Add a language
+
+Write `recipes/<lang>.yml` — tree-sitter queries for entities, references,
+and bindings, plus a resolution strategy (`lexical`, `path`, or `name`).
+Put a fixture repo in `fixtures/<lang>/` with an `expected.yml`; the test
+suite refuses recipes that can't prove their own edges. No engine changes:
+the engine is language-blind by construction (~500 lines, SQLite, stdlib).
+
+## Repo layout
+
+```
+codepulse/engine.py     language-blind extraction + resolution -> SQLite
+codepulse/recipes.py    recipe loading, validation, fixture checks
+codepulse/six.py        the six verbs over the graph
+codepulse/boards.py     saved views: handlers, hop diagrams, file graph
+codepulse/panel.py      HTTP server for the webview panel
+codepulse/mcp_server.py stdio MCP server (the agent surface)
+recipes/*.yml           the six languages, as data
+skill/SKILL.md          the Claude Code skill setup.sh installs
+extension/              VSIX shell for VS Code / Cursor / Antigravity
+specs/ + tests/         spec-first: every feature has a SPEC.md and its tests
 ```
 
-## Try it
-
-```sh
-uv run --with pytest python -m pytest tests/ -q      # 30 tests
-uv run --with anthropic --with pydantic python demo/demo.py
-```
-
-The demo diffs two snapshots of a toy shop codebase and shows: the six-verb query
-surface, identity surviving a rename+move and a split, and the Judge catching a
-**silent promise break** — `process()` kept its signature but quietly stopped
-auditing orders. Set `ANTHROPIC_API_KEY` to have Claude (`claude-opus-4-8`) write
-the behavioral summaries; without it a paranoid heuristic escalates anything unsure.
+Legacy V1 pipeline (`store.py`, `verbs.py`, `cli.py`, hooks, judge, workbench)
+still works and awaits migration; the modules above are the current stack.
 
 ## Documents
 
-- [PRD](PRD.md) — problem, thesis, six verbs, phasing, metrics
-- [Identity spec](specs/identity/SPEC.md) + [architecture](specs/identity/ARCHITECTURE.md)
-- [Relationships spec](specs/relationships/SPEC.md)
-
-## Next (per PRD phasing)
-
-MCP server exposing the six verbs, Claude Code pre-edit/post-edit hooks, incremental
-watcher daemon, version ledger (V2), fork lineage and drift (V3).
+- [PRD](PRD.md) — problem, thesis, the six-verb ceiling, phasing
+- [specs/](specs/) — recipes, six, mesh, boards, panel, setup: one page each
+- [demo/benchmark.md](demo/benchmark.md) — the A/B value proof
