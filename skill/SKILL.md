@@ -1,14 +1,18 @@
 ---
 name: codepulse
-description: Use for any structural question about this repo — what something is, who calls or uses it, what breaks if it changes, where something lives, what a diff touches, entry points, or an architecture overview — and before editing any widely-used function. Ask the CodePulse map via the pulse_* MCP tools INSTEAD of grep/glob/reading files; one tool call replaces many searches.
+description: Answer structural questions about a codebase from its CodePulse map instead of grepping. Use whenever the user asks what something is, who calls or uses it, what breaks if it changes, where something lives, what a diff/PR touches, entry points, dependencies between files or languages, or wants an architecture or repo overview — and before editing any widely-used function, even if they never say "codepulse". If the pulse_* MCP tools are connected, one call replaces many greps; if they are not connected, offer the one-command setup before falling back to search.
 ---
 
 # CodePulse — ask the map, don't rebuild it
 
-This repo has a live entity-relation graph covering Python, TypeScript, YAML,
-Dockerfile, Terraform, and HTML, refreshed on every call. It already knows the
-structure you would otherwise re-derive by grepping. Asking it is one tool
-call; grepping is many. Prefer the map.
+A CodePulse map is a live entity-relation graph of the repo — Python,
+TypeScript, YAML, Dockerfile, Terraform, HTML — refreshed on every call. It
+already knows the structure you would otherwise re-derive by reading files.
+Asking it is one tool call; grepping is many. Prefer the map.
+
+**If the `pulse_*` tools are not in this session:** the repo isn't wired yet.
+Say so and offer the setup — `path/to/CodePulse/setup.sh <this repo>`, then
+restart the session — before doing any large-scale exploration by hand.
 
 ## The tools
 
@@ -33,6 +37,8 @@ Config keys, Terraform variables, and YAML keys are entities too — `pulse_who 
 3. **Before editing anything**: `pulse_radius` on it. Mention the blast radius in your answer.
 4. **For a review or diff**: `pulse_changed` first; only then read the changed files themselves.
 5. **Trust the map's answers** — don't re-verify with grep what a tool already returned.
+   The savings come from *not* re-deriving; a pulse call followed by a confirming
+   grep costs more than either alone.
 
 ## Honest holes — when to fall back
 
@@ -40,7 +46,7 @@ The map only claims what it can prove. It cannot see: dynamic dispatch,
 string-built references, `getattr` chains, star imports. So:
 
 - `dependents: 0` on something clearly used means it's invoked dynamically —
-  say so, and confirm with ONE targeted grep if it matters.
+  say so explicitly, and confirm with ONE targeted grep if the answer matters.
 - An `external:` target means outside the repo or unresolvable — normal, not an error.
 - Fall back to grep for string literals, comments, docs, and data — the map is
   about structure, not text.
