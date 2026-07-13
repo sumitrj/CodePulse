@@ -67,6 +67,30 @@ def test_codepulse_ignore_file_excludes_directories(tmp_path):
     assert {e.addr.path for e in engine.entities()} == {"app.py"}
 
 
+# === git scan respects .gitignore and skips nested repos ===
+
+def test_git_scan_respects_gitignore_and_skips_nested_repos(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / "app.py").write_text("def keep():\n    return 1\n")
+    (repo / "data").mkdir()
+    (repo / "data" / "junk.py").write_text("def ignored():\n    pass\n")
+    (repo / ".gitignore").write_text("data/\n")
+    clone = repo / "vendor-clone"
+    clone.mkdir()
+    subprocess.run(["git", "init", "-q", str(clone)], check=True)
+    (clone / "big.py").write_text("def vendored():\n    pass\n")
+    engine = Engine(tmp_path / "pulse.db",
+                    [load_recipe(RECIPES_DIR / "python.yml")], root=repo)
+
+    engine.apply()
+
+    paths = {e.addr.path for e in engine.entities()}
+    assert paths == {"app.py"}                       # gitignored data/ + nested clone both gone
+    assert "vendor-clone" in engine.nested_repos()   # but the clone is surfaced
+
+
 # === recipes resolve in both layouts ===
 
 def test_builtin_recipes_load_from_repo_layout():

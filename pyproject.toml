@@ -1,6 +1,6 @@
 [project]
 name = "codepulse"
-version = "0.3.0"
+version = "0.4.0"
 description = "A system of record for code as capabilities - units, identity, edges, and a change judge"
 requires-python = ">=3.11"
 dependencies = [

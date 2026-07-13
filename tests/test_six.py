@@ -114,6 +114,24 @@ def test_refresh_reextracts_only_changed_files(engine):
     assert list(report.extracted) == ["orders.py"]
 
 
+# === AC8 addendum (the 45s bug): an unchanged repo reads zero files ===
+
+def test_refresh_on_unchanged_repo_opens_no_files(engine, monkeypatch):
+    import codepulse.engine as eng_mod
+    reads = {"n": 0}
+    real = eng_mod.hashlib.sha256
+
+    def counting(data=b""):
+        reads["n"] += 1
+        return real(data)
+
+    monkeypatch.setattr(eng_mod.hashlib, "sha256", counting)
+    report = engine.refresh()          # nothing touched since apply()
+
+    assert report.extracted == ()
+    assert reads["n"] == 0             # size+mtime matched — no file was hashed
+
+
 # === AC9: excluded directories are never scanned ===
 
 def test_excluded_directories_are_not_scanned(tmp_path, python_recipe):

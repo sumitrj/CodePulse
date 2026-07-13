@@ -10,8 +10,10 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
+import os
 import posixpath
 import sqlite3
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -67,7 +69,8 @@ EXCLUDE_DIRS = {
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS files(
-    path TEXT PRIMARY KEY, hash TEXT, recipe TEXT, recipe_version TEXT DEFAULT '');
+    path TEXT PRIMARY KEY, hash TEXT, recipe TEXT,
+    recipe_version TEXT DEFAULT '', stat TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS entities(
     path TEXT, name TEXT, kind TEXT, line INTEGER,
     recipe TEXT, recipe_version TEXT,
@@ -109,6 +112,17 @@ class Engine:
         self.db.executescript(_SCHEMA)
         self._compiled = {}
         self.progress = None          # optional callable(done, total) for long indexes
+        # precompute a fast matcher: most files are matched by a plain suffix
+        # (*.py, *.ts…), so a dict lookup replaces fnmatch on every walked file.
+        self._suffix_map: dict[str, Recipe] = {}
+        self._other_pats: list[tuple[str, Recipe]] = []
+        for recipe in self.recipes:
+            for pat in recipe.matches:
+                stem = pat[1:]
+                if pat.startswith("*.") and not any(c in stem for c in "*?["):
+                    self._suffix_map.setdefault(stem, recipe)
+                else:
+                    self._other_pats.append((pat, recipe))
         self._excludes = set(EXCLUDE_DIRS)
         ignore = self.root / ".codepulse" / "ignore"
         if ignore.is_file():          # repo-owner scoping: one directory name per line
@@ -132,6 +146,8 @@ class Engine:
             return
         if file_columns and "recipe_version" not in file_columns:
             self.db.execute("ALTER TABLE files ADD COLUMN recipe_version TEXT DEFAULT ''")
+        if file_columns and "stat" not in file_columns:
+            self.db.execute("ALTER TABLE files ADD COLUMN stat TEXT DEFAULT ''")
 
     # ── extraction ──────────────────────────────────────────────────────
 
@@ -142,41 +158,124 @@ class Engine:
         return self._extract(sorted(Path(p) for p in changed))
 
     def refresh(self) -> ApplyReport:
-        """The freshness primitive: re-extract files whose content OR recipe
-        version changed (a better recipe re-maps history), forget deleted ones."""
-        known = {path: (digest, version) for path, digest, version in
-                 self.db.execute("SELECT path, hash, recipe_version FROM files")}
-        on_disk = {}
-        for path in self._scan():
+        """The freshness primitive. Fast path: a file whose size+mtime match
+        what we stored is never opened — this is what keeps re-runs sub-second
+        and the write-lock held for milliseconds. Only files whose stat or
+        recipe version moved get hashed, and only a real content change
+        (or a better recipe) triggers re-extraction."""
+        known = {path: (stat, digest, version) for path, stat, digest, version in
+                 self.db.execute("SELECT path, stat, hash, recipe_version FROM files")}
+        scanned = self._scan()
+        total = len(scanned)
+        on_disk = set()
+        changed = []
+        restat = []          # content identical, only mtime moved — refresh the stamp
+        for index, path in enumerate(scanned):
+            if self.progress and index and index % 500 == 0:
+                self.progress(index, total)
             rel = path.relative_to(self.root).as_posix()
             recipe = self._recipe_for(path)
+            version = recipe.version if recipe else ""
             try:
-                on_disk[rel] = (hashlib.sha256(path.read_bytes()).hexdigest(),
-                                recipe.version if recipe else "")
+                st = path.stat()
             except OSError:
                 continue
-        changed = [self.root / rel for rel, state in sorted(on_disk.items())
-                   if known.get(rel) != state]
-        for rel in sorted(set(known) - set(on_disk)):
+            on_disk.add(rel)
+            sig = f"{st.st_mtime_ns}:{st.st_size}"
+            prior = known.get(rel)
+            if prior and prior[0] == sig and prior[2] == version:
+                continue                              # unchanged — never read the file
+            try:
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                continue
+            if prior and prior[1] == digest and prior[2] == version:
+                restat.append((sig, rel))             # same bytes, just re-stamp
+            else:
+                changed.append(self.root / rel)
+        for sig, rel in restat:
+            self.db.execute("UPDATE files SET stat=? WHERE path=?", (sig, rel))
+        for rel in sorted(set(known) - on_disk):
             self.db.execute("DELETE FROM entities WHERE path=?", (rel,))
             self.db.execute("DELETE FROM entities_fts WHERE path=?", (rel,))
             self.db.execute("DELETE FROM edges WHERE src_path=?", (rel,))
             self.db.execute("DELETE FROM files WHERE path=?", (rel,))
+        if restat or set(known) - on_disk:
+            self.db.commit()
         return self._extract(changed)
 
     def _scan(self) -> list[Path]:
-        return sorted(
-            p for p in self.root.rglob("*")
-            if p.is_file()
-            and not any(part in self._excludes for part in p.relative_to(self.root).parts)
-            and self._recipe_for(p) is not None
-        )
+        # Prefer git: it already knows what's source vs ignored (.gitignore),
+        # returns the list from its index in milliseconds, and doesn't descend
+        # into nested repos — so vendored clones are skipped for free. Walking
+        # a big tree by hand was the 45s bug. Non-git repos fall back to os.walk.
+        return self._git_scan() if self._is_git() else self._walk_scan()
 
-    def _recipe_for(self, path: Path) -> Recipe | None:
-        for recipe in self.recipes:
-            if any(fnmatch.fnmatch(path.name, pat) for pat in recipe.matches):
+    def _is_git(self) -> bool:
+        return (self.root / ".git").exists()
+
+    def _git_scan(self) -> list[Path]:
+        try:
+            res = subprocess.run(
+                ["git", "-C", str(self.root), "ls-files", "-z",
+                 "--cached", "--others", "--exclude-standard"],
+                capture_output=True, timeout=120)
+        except (OSError, subprocess.SubprocessError):
+            return self._walk_scan()
+        if res.returncode != 0:
+            return self._walk_scan()
+        out = []
+        for rel in res.stdout.decode("utf-8", "ignore").split("\0"):
+            if not rel or rel.startswith(".."):
+                continue
+            parts = rel.split("/")
+            if any(part in self._excludes for part in parts):
+                continue
+            if self._recipe_for_name(parts[-1]) is not None:
+                out.append(self.root / rel)
+        return sorted(out)
+
+    def _walk_scan(self) -> list[Path]:
+        out = []
+        for dirpath, dirnames, filenames in os.walk(self.root):
+            dirnames[:] = [d for d in dirnames if d not in self._excludes]
+            for name in filenames:
+                if self._recipe_for_name(name) is not None:
+                    out.append(Path(dirpath) / name)
+        return sorted(out)
+
+    def nested_repos(self) -> list[str]:
+        """Vendored sub-repos under root — skipped by the git scan, surfaced so
+        the user can map one directly by running codepulse inside it."""
+        if not self._is_git():
+            return []
+        try:
+            res = subprocess.run(
+                ["git", "-C", str(self.root), "ls-files", "-z", "--others",
+                 "--directory", "--no-empty-directory", "--exclude-standard"],
+                capture_output=True, timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            return []
+        found = []
+        for rel in res.stdout.decode("utf-8", "ignore").split("\0"):
+            rel = rel.rstrip("/")
+            if rel and (self.root / rel / ".git").exists():
+                found.append(rel)
+        return sorted(found)
+
+    def _recipe_for_name(self, name: str) -> Recipe | None:
+        dot = name.rfind(".")
+        if dot != -1:
+            recipe = self._suffix_map.get(name[dot:])
+            if recipe is not None:
+                return recipe
+        for pat, recipe in self._other_pats:      # Dockerfile, Dockerfile.* …
+            if fnmatch.fnmatch(name, pat):
                 return recipe
         return None
+
+    def _recipe_for(self, path: Path) -> Recipe | None:
+        return self._recipe_for_name(path.name)
 
     def _extract(self, paths) -> ApplyReport:
         extracted = []
@@ -197,11 +296,16 @@ class Engine:
             self.db.execute("DELETE FROM entities_fts WHERE path=?", (rel,))
             self.db.execute("DELETE FROM edges WHERE src_path=?", (rel,))
             self._extract_file(rel, source, recipe)
+            try:
+                st = abs_path.stat()
+                sig = f"{st.st_mtime_ns}:{st.st_size}"
+            except OSError:
+                sig = ""
             self.db.execute(
-                "INSERT OR REPLACE INTO files(path, hash, recipe, recipe_version) "
-                "VALUES(?,?,?,?)",
+                "INSERT OR REPLACE INTO files(path, hash, recipe, recipe_version, stat) "
+                "VALUES(?,?,?,?,?)",
                 (rel, hashlib.sha256(source.encode()).hexdigest(),
-                 recipe.name, recipe.version),
+                 recipe.name, recipe.version, sig),
             )
             extracted.append(rel)
         self._resolve_all()

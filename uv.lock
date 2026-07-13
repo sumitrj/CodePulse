@@ -54,7 +54,7 @@ wheels = [
 
 [[package]]
 name = "codepulse"
-version = "0.2.1"
+version = "0.3.3"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },

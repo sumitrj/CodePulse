@@ -55,10 +55,34 @@ def wire(root: Path) -> None:
         print("  git   : .codepulse/ locally ignored")
 
 
+_IGNORE_SCAFFOLD = """\
+# codepulse ignore — one directory name per line, matched anywhere in the tree.
+# codepulse already respects your .gitignore and skips the usual noise
+# (.git, .venv, node_modules, __pycache__, dist, build, site-packages, …).
+# Add directory names below to scope the map further — e.g. data, notebooks,
+# fixtures — then re-run `codepulse .`. Lines starting with # are ignored.
+"""
+
+
+def _first_run_scaffold(root: Path, engine: Engine) -> None:
+    """Surface the ignore decision at the moment it matters — first run —
+    by writing an editable .codepulse/ignore and naming what was skipped."""
+    ignore = root / ".codepulse" / "ignore"
+    if not ignore.exists():
+        ignore.write_text(_IGNORE_SCAFFOLD)
+        print(f"  scope : respecting .gitignore · edit {ignore} to narrow further")
+    nested = engine.nested_repos()
+    if nested:
+        shown = ", ".join(nested[:4]) + (f" (+{len(nested) - 4} more)" if len(nested) > 4 else "")
+        print(f"  nested: skipped {len(nested)} vendored repo(s): {shown}")
+        print("          to map one, run  codepulse <that-dir>")
+
+
 def build_engine(root: Path, announce: bool = True) -> Engine:
     (root / ".codepulse").mkdir(exist_ok=True)
     engine = Engine(root / ".codepulse" / "pulse.db", builtin_recipes(), root=root)
     if announce:
+        _first_run_scaffold(root, engine)
         last = {"t": time.time()}
 
         def progress(done: int, total: int) -> None:
