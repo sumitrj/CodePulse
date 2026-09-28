@@ -1,107 +1,106 @@
 # CodePulse
 
-One live map of your repo — every function, class, config key, Terraform
-variable, and Dockerfile edge, across languages — read by you in an editor
-panel and by your agents over MCP. Same map, same answers, fresh within
-seconds of a save.
+**A live map of your repo, for you and your AI coding agent.**
 
-Languages are **recipes**, not code: a YAML file of tree-sitter queries adds a
-language. Six ship today: Python, TypeScript, YAML, Dockerfile, Terraform, HTML.
+For developers who work with an AI coding agent (Claude Code, or any MCP
+client) in a repo that mixes languages: Python and TypeScript, plus the
+Dockerfiles, Terraform, and YAML that wire them together.
 
-## Install
+---
+
+## The map
+
+CodePulse keeps one live map of everything in your repo and what touches
+what, across every language.
+
+![The map of examples/shop: a Dockerfile copies app.py, index.html loads cart.ts, checkout calls total, and save_order reads the DB_URL variable declared in Terraform](docs/img/map.svg)
+
+This is [`examples/shop`](examples/shop), six files in five languages. The
+blue lines are the point: a `COPY` in a Dockerfile, a `<script src>`, and an
+`os.environ["DB_URL"]` that reaches a Terraform variable. A tool that reads
+one language at a time can't see them.
+
+## Two readers
+
+You read the map in a panel; your agent reads the same map as tools. The
+answers are the same.
+
+![One map, two readers: you in the editor panel, your AI agent over MCP. Both get the same answer](docs/img/readers.svg)
+
+## Six questions
+
+| Ask | Your agent calls | You click |
+|---|---|---|
+| What is this? | `pulse_what` | WHAT |
+| Who touches it? | `pulse_who` | WHO |
+| What breaks if I change it? | `pulse_radius` | BREAKS |
+| What did my change touch? | `pulse_changed`, `pulse_delta` | CHANGED |
+| Where does X live? | `pulse_locate` | WHERE |
+| Where does it start? | `pulse_handlers`, `pulse_map` | HANDLERS, MAP |
+
+Before you edit `DB_URL` in Terraform, ask what breaks:
+
+![The panel's BREAKS view: DB_URL in infra.tf, then save_order, checkout, and main in app.py, one hop apart](docs/img/panel-breaks.png)
+
+An agent asking `pulse_radius DB_URL` gets the same three functions as text,
+in one call, without opening a file.
+
+## Get started
+
+You need Python 3.11+ and [uv](https://docs.astral.sh/uv/), on macOS or Linux.
 
 ```sh
-git clone <this repo>
-uv tool install ./CodePulse            # once: puts `codepulse` on your PATH
+uv tool install git+https://github.com/sumitrj/CodePulse   # puts `codepulse` on your PATH
+codepulse install                                          # once per machine
 ```
 
-## Use (one word per repo)
+Now start Claude Code in any repo, and the map is there. The first question
+in a repo builds its map; after that, only files you've changed are read again.
 
-```sh
-cd /path/to/your/repo
-codepulse .                            # wire + build the map + start the panel
-```
+- **Ask about another repo** without changing directory: every tool takes an
+  optional `repo` path.
+- **Open the panel** for the repo you're in: `codepulse .` prints its URL.
+  In VS Code or Cursor, [the extension](extension/) puts it in the sidebar.
+- **Try the example first**: clone this repo and run `codepulse examples/shop`.
 
-That one command registers the MCP server in the repo's `.mcp.json`, installs
-the Claude Code skill, builds the map with live progress (`.codepulse/`, kept
-out of git automatically), and serves the panel. Re-running it is always safe.
-Then open Claude Code in the repo and approve the `codepulse` server when
-prompted. `codepulse . --no-panel` wires without the panel; a
-`.codepulse/ignore` file (one directory name per line) scopes huge repos.
+`codepulse install` registers the tools once for your user (`claude mcp add
+--scope user`), installs a short [skill](codepulse/skill/SKILL.md) that tells
+Claude to ask the map before searching, and pre-approves the tools. Every
+tool only reads. Maps live in `~/.cache/codepulse/`, so asking never writes
+into your repo. (`codepulse .` keeps that repo's map in `.codepulse/`,
+ignored by git.)
 
-**Prove it to yourself:** [demo/benchmark.md](demo/benchmark.md) — same five
-questions with and without the map; you score time, tokens, and accuracy from
-your own screen.
+## Can you trust it?
 
-## What your agent gets (MCP + skill)
+**It's fresh.** Save a file, and the next answer includes it.
 
-Seven tools, plain-sentence answers:
+**It's honest.** It only claims what it can prove. A function called only
+through dynamic dispatch shows "nothing on the map calls this", not a guess.
+When two things share a name, the answer says so and names the other one.
 
-| Tool | Question |
+**It's measured.** Take 500 real bug reports from
+[SWE-bench Verified](https://www.swebench.com/), and ask which files the fix
+had to change, given only the issue text. The map plus keyword search puts
+the right file first more often than keyword search alone. On its own, the
+map is worse.
+
+![Difference from keyword search with 95% intervals. Map plus keyword search: right file ranked first +0.046, better. Map alone: right file in top 10 −0.119, worse](docs/img/proof.svg)
+
+The method, and what it doesn't show, is in [How I tested it](docs/HOW_I_TESTED.md).
+That benchmark is all Python, so the cross-language edges aren't measured yet.
+
+## Languages
+
+Seven ship today: Python, TypeScript, TSX, YAML, Dockerfile, Terraform, HTML.
+Each language is one YAML file (a *recipe*), not code; the Dockerfile recipe
+is 12 lines. To add one, see [Contributing](docs/CONTRIBUTING.md).
+
+## Docs
+
+| If you want to… | Read |
 |---|---|
-| `pulse_map` | Repo silhouette: size, load-bearing entities |
-| `pulse_what` | What is this? Card: kind, line, calls, dependents |
-| `pulse_who` | Who touches it? All incoming edges |
-| `pulse_radius` | What breaks if I change it? Transitive, by hops |
-| `pulse_changed` | What did my diff touch, and who's at risk? |
-| `pulse_locate` | Where does X live? |
-| `pulse_handlers` | Estimated entry points (uncalled roots with reach) |
-
-The installed skill teaches Claude to ask the map before grepping — an
-architecture overview is two tool calls, not forty file reads.
-
-## What you get (the panel)
-
-```sh
-.venv/bin/python -m codepulse.panel --root /path/to/your/repo --port 7319
-```
-
-Or install [extension/codepulse-0.1.0.vsix](extension/) in VS Code / Cursor /
-Antigravity (activity bar → pulse icon; set `codepulse.python` to this repo's
-`.venv/bin/python`). The panel is the same seven questions rendered visually:
-the whole map layered by dependency depth, blast radius as hop columns,
-click-to-focus, a handlers board. Settings are four rows — theme, entity
-colors, font, size — instant, done.
-
-## Cross-language edges — the point
-
-`COPY app.py` in a Dockerfile points at the Python module. `<script src>`
-points at the TypeScript file. `os.environ["DB_URL"]` in Python reaches
-`variable "DB_URL"` in Terraform. Blast radius walks all of it — the edges no
-single-language tool can see.
-
-The map is honest: it only claims what it can prove. Dynamic dispatch and
-string-built references don't get invented edges; the skill teaches agents to
-say so instead of guessing.
-
-## Add a language
-
-Write `recipes/<lang>.yml` — tree-sitter queries for entities, references,
-and bindings, plus a resolution strategy (`lexical`, `path`, or `name`).
-Put a fixture repo in `fixtures/<lang>/` with an `expected.yml`; the test
-suite refuses recipes that can't prove their own edges. No engine changes:
-the engine is language-blind by construction (~500 lines, SQLite, stdlib).
-
-## Repo layout
-
-```
-codepulse/engine.py     language-blind extraction + resolution -> SQLite
-codepulse/recipes.py    recipe loading, validation, fixture checks
-codepulse/six.py        the six verbs over the graph
-codepulse/boards.py     saved views: handlers, hop diagrams, file graph
-codepulse/panel.py      HTTP server for the webview panel
-codepulse/mcp_server.py stdio MCP server (the agent surface)
-recipes/*.yml           the six languages, as data
-skill/SKILL.md          the Claude Code skill setup.sh installs
-extension/              VSIX shell for VS Code / Cursor / Antigravity
-specs/ + tests/         spec-first: every feature has a SPEC.md and its tests
-```
-
-Legacy V1 pipeline (`store.py`, `verbs.py`, `cli.py`, hooks, judge, workbench)
-still works and awaits migration; the modules above are the current stack.
-
-## Documents
-
-- [PRD](PRD.md) — problem, thesis, the six-verb ceiling, phasing
-- [specs/](specs/) — recipes, six, mesh, boards, panel, setup: one page each
-- [demo/benchmark.md](demo/benchmark.md) — the A/B value proof
+| Check the numbers yourself | [How I tested it](docs/HOW_I_TESTED.md) · [`bench/`](bench/README.md) |
+| Compare with and without the map on your own repo | [The A/B](demo/benchmark.md) |
+| Add a language or change the code | [Contributing](docs/CONTRIBUTING.md) |
+| Write about CodePulse | [The explanation ladder](docs/EXPLANATION.md) |
+| See the original vision | [PRD](docs/PRD.md) |

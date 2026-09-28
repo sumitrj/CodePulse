@@ -1,3 +1,7 @@
+> **The original vision (July 2026), kept for history.** The shipped product is
+> narrower: the map and its questions. Identity, the change judge, and fleet
+> inventory below are not built. For what exists, read the [README](../README.md).
+
 # CodePulse — PRD v1
 
 **One-liner:** A system of record for code as capabilities — every piece of logic gets an identity, a promise, a version, and a map of dependents, so agents and humans stop re-deriving structure and nothing changes silently.

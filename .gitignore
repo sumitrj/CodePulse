@@ -7,5 +7,12 @@ build/
 *.egg-info/
 .DS_Store
 
-# CodePulse runtime state (generated per-repo by `pulse.py index`)
+# CodePulse runtime state (generated per-repo by `codepulse <repo>`)
 .codepulse/
+
+# what `codepulse examples/shop` wires into the example
+examples/*/.mcp.json
+examples/*/.claude/
+
+# raw benchmark output: large, and rebuilt by `python -m bench.run`
+bench/results/**/results.json

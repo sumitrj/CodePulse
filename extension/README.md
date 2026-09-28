@@ -1,20 +1,24 @@
-# CodePulse
+# CodePulse for VS Code
 
-One map, two readers, six questions.
+For developers who want the CodePulse panel in the VS Code or Cursor sidebar
+instead of a browser tab.
 
-CodePulse keeps a live entity-relation graph of your repo — Python, TypeScript, YAML, Dockerfile, Terraform, HTML — fresh within seconds of a save. You read it in this panel; your agents read the identical answers over MCP. Same map, same six questions:
+The panel shows a live map of the folder you have open, and answers six
+questions about anything in it: what is this, who touches it, what breaks if
+I change it, what did my change touch, where does X live, and where does it
+start. Your AI agent gets the same answers as tools; see the
+[main README](../README.md).
 
-**What is this · Who touches it · What breaks · What changed · Where does X live · How far apart**
+## Install
 
-## Requirements
-
-A Python (3.11+) with the `codepulse` package installed. Point the
-`codepulse.python` setting at it (e.g. the CodePulse repo's `.venv/bin/python`).
+1. Install CodePulse: `uv tool install git+https://github.com/sumitrj/CodePulse`
+2. In VS Code: **Extensions → … → Install from VSIX**, and pick
+   `codepulse-0.1.0.vsix` from this folder.
+3. Set **`codepulse.python`** to the Python that has CodePulse installed.
+   With uv that's `~/.local/share/uv/tools/codepulse/bin/python`.
 
 ## Use
 
 Click the pulse icon in the activity bar, or run **CodePulse: Open Panel**.
-The extension starts a local server for the open folder; nothing leaves your machine.
-
-Languages are recipes — YAML files of tree-sitter queries. Add one and the
-engine speaks a new language without a code change.
+The extension starts a local server for the open folder, and nothing leaves
+your machine.

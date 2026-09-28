@@ -1,9 +1,17 @@
 # The explanation ladder
 
+For anyone writing about CodePulse: the README, the site, the skill, the panel, a pitch.
+
 CodePulse introduces several new concepts at once. New concepts are a tax on
 the reader. This page is the constitution for how we spend that tax — in the
 README, the website, the skill, the panel, and every pitch. If copy anywhere
 contradicts this ladder, the copy is wrong.
+
+## Who we're talking to
+
+Developers who work with an AI coding agent in a repo that mixes languages.
+They know their code and their tools. They don't know our words, so every
+new word has to earn its place.
 
 ## Three rules
 
@@ -25,8 +33,8 @@ contradicts this ladder, the copy is wrong.
 | 3 | **The questions** | You can ask the map six things: what is this, who touches it, what breaks if I change it, what changed, where does X live, what are the entry points. | Before editing `total()`, ask *what breaks* — it lists every dependent, hops deep. | verbs, query surface, boards (say "saved views" if needed) |
 | 4 | **Fresh** | Save a file; the map is correct about two seconds later. | Only the saved file re-parses — never the whole repo. | incremental extraction, freshness NFR, kill-gate |
 | 5 | **Honest** | The map only claims what it can prove; where it can't see, it says so. | A function called through dynamic dispatch shows "0 known callers — likely dynamic," not a guess. | honest-over-complete (internal), confidence scores |
-| 6 | **Recipes** | A language is a YAML file, not code — six ship today, and writing a seventh needs no engine change. | The whole Python language support is 50 lines of YAML. | extraction kernel, dialect, tree-sitter (until asked how) |
-| 7 | **The proof** | Same five questions with and without the map: about 8× fewer tokens, measured — and the benchmark is in the repo so you can measure it yourself. | demo/benchmark.md — you pick the questions, you score it. | revolutionary, blazing, game-changing, any superlative |
+| 6 | **Recipes** | A language is a YAML file, not code — seven ship today, and adding one needs no engine change. | The whole Dockerfile support is 12 lines of YAML. | extraction kernel, dialect, tree-sitter (until asked how) |
+| 7 | **The proof** | On 500 real bug reports, the map plus keyword search puts the right file first more often than keyword search alone; on its own, the map is worse. | docs/HOW_I_TESTED.md — the method, the intervals, and what went against us. | revolutionary, blazing, game-changing, any superlative |
 
 ## What this forbids
 
@@ -36,5 +44,6 @@ contradicts this ladder, the copy is wrong.
   temptation, because recipes are the clever part. Clever is not first; useful is first.
 - Claiming without a number, and numbers without a method. Every performance
   claim links to the benchmark.
+- Any token-savings number. None has been measured; see HOW_I_TESTED.md.
 - More than one metaphor per rung. The map is *the* metaphor; don't stack
   "nervous system", "X-ray", or "GPS" on top of it.

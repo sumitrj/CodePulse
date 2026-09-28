@@ -1,23 +1,28 @@
 # The A/B — decide for yourself
 
+For developers deciding whether CodePulse is worth it on their own repo.
+
+> **This is the felt experience, not the evidence.** It has no fixed task set
+> and no ground truth, so it proves something to the person who runs it and
+> nothing to anyone else. For a number a stranger can check — a public dataset,
+> a real baseline, and a script that reproduces it — see
+> [`bench/`](../bench/README.md). Run this one to feel the difference; cite that
+> one when you make a claim.
+
 Same repo, same questions, two Claude Code sessions. One has the map, one
-doesn't. You judge time, tokens, and accuracy. Nothing here is on the honor
-system — every number comes off your own screen.
+doesn't. You judge time, tokens, and accuracy — every number comes off your
+own screen.
 
 ## Order matters: run WITHOUT first
 
 **Session B — without CodePulse.** Open Claude Code in a clean checkout
-(no setup run). Ask the five questions below, one per message. After the last
+(CodePulse not installed). Ask the five questions below, one per message. After the last
 answer, record wall time, then run `/cost` and record tokens.
 
-**Session A — with CodePulse.** Run the one command:
-
-```
-/path/to/CodePulse/setup.sh /path/to/your/repo
-```
-
-Start a fresh Claude Code session in the repo, approve the `codepulse` server
-when prompted, ask the same five questions, record the same numbers.
+**Session A — with CodePulse.** Install it ([Get started](../README.md#get-started)),
+start a fresh Claude Code session in the repo, ask the same five questions,
+and record the same numbers. Run `claude mcp remove --scope user codepulse`
+afterwards if you don't want to keep it.
 
 ## The five questions
 
