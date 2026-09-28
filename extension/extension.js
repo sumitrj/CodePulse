@@ -6,6 +6,9 @@ const vscode = require("vscode");
 const { spawn } = require("child_process");
 const net = require("net");
 const http = require("http");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 let server;
 let port;
@@ -32,6 +35,17 @@ function waitFor(url, tries = 40) {
   });
 }
 
+// The user's setting wins; otherwise the Python that `uv tool install` gave
+// CodePulse, so installing the tool is the only setup; else plain python3.
+function pythonFor(cfg) {
+  const set = cfg.inspect("python") || {};
+  const chosen = set.workspaceFolderValue || set.workspaceValue || set.globalValue;
+  if (chosen) return chosen;
+  const data = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share");
+  const uv = path.join(data, "uv", "tools", "codepulse", "bin", "python");
+  return fs.existsSync(uv) ? uv : "python3";
+}
+
 async function ensureServer(context) {
   if (server) return port;
   const cfg = vscode.workspace.getConfiguration("codepulse");
@@ -41,7 +55,7 @@ async function ensureServer(context) {
   }
   const root = folders[0].uri.fsPath;
   port = cfg.get("port") || (await freePort());
-  server = spawn(cfg.get("python"), ["-m", "codepulse.panel", "--root", root, "--port", String(port)], {
+  server = spawn(pythonFor(cfg), ["-m", "codepulse.panel", "--root", root, "--port", String(port)], {
     cwd: root,
   });
   server.on("exit", () => { server = undefined; });
