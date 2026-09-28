@@ -1,6 +1,5 @@
 """
-Tests for the codepulse command. Maps to specs/setup/SPEC.md (the CLI is the
-one-noun form of setup.sh) plus the .codepulse/ignore scoping rule.
+Tests for the codepulse command. Maps to specs/setup/SPEC.md plus the .codepulse/ignore scoping rule.
 """
 import json
 import subprocess

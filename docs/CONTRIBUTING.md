@@ -77,10 +77,8 @@ bench/             the SWE-bench localization benchmark
 extension/         the VS Code / Cursor sidebar
 ```
 
-`store.py`, `verbs.py`, `cli.py`, `config.py`, `judge.py`, `workbench.py`,
-`app.py`, `webapp/`, `identity/`, `relationships.py`, `pulse.py`, and
-`demo/demo.py` are the first version. They still pass their tests, but nothing in the current product
-calls them.
+The first version (unit identity, a change judge, a workbench) was removed
+once the map replaced it; it's in git history before the commit that says so.
 
 ## How changes are made
 
