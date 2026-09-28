@@ -12,10 +12,11 @@ start. Your AI agent gets the same answers as tools; see the
 ## Install
 
 1. Install CodePulse: `uv tool install git+https://github.com/sumitrj/CodePulse`
-2. In VS Code: **Extensions → … → Install from VSIX**, and pick
-   `codepulse-0.1.0.vsix` from this folder.
-3. Set **`codepulse.python`** to the Python that has CodePulse installed.
-   With uv that's `~/.local/share/uv/tools/codepulse/bin/python`.
+2. In VS Code or Cursor: **Extensions → … → Install from VSIX**, and pick
+   `codepulse-0.4.0.vsix` from this folder.
+
+It finds the Python that `uv tool install` created on its own. If you
+installed CodePulse another way, set **`codepulse.python`** to that Python.
 
 ## Use
 

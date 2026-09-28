@@ -2,26 +2,42 @@
   "name": "codepulse",
   "displayName": "CodePulse",
   "description": "A live map of your repo, for you and your AI coding agent.",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "publisher": "sumitrj",
   "license": "MIT",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other", "Visualization"],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
   "main": "./extension.js",
   "activationEvents": [],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
-        { "id": "codepulse", "title": "CodePulse", "icon": "media/pulse.svg" }
+        {
+          "id": "codepulse",
+          "title": "CodePulse",
+          "icon": "media/pulse.svg"
+        }
       ]
     },
     "views": {
       "codepulse": [
-        { "type": "webview", "id": "codepulse.panel", "name": "Pulse" }
+        {
+          "type": "webview",
+          "id": "codepulse.panel",
+          "name": "Pulse"
+        }
       ]
     },
     "commands": [
-      { "command": "codepulse.open", "title": "CodePulse: Open Panel" }
+      {
+        "command": "codepulse.open",
+        "title": "CodePulse: Open Panel"
+      }
     ],
     "configuration": {
       "title": "CodePulse",
@@ -29,7 +45,7 @@
         "codepulse.python": {
           "type": "string",
           "default": "python3",
-          "description": "Python interpreter with the codepulse package installed"
+          "description": "Python with the codepulse package installed. Leave unset to use the one `uv tool install` created."
         },
         "codepulse.port": {
           "type": "number",
