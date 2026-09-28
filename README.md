@@ -43,7 +43,19 @@ Before you edit `DB_URL` in Terraform, ask what breaks:
 ![The panel's BREAKS view: DB_URL in infra.tf, then save_order, checkout, and main in app.py, one hop apart](docs/img/panel-breaks.png)
 
 An agent asking `pulse_radius DB_URL` gets the same three functions as text,
-in one call, without opening a file.
+in one call, without opening a file. Save a file, and the next answer includes it.
+
+## When it helps
+
+| You're about to… | Ask | You get |
+|---|---|---|
+| Change a function, a config key, or an env var | What breaks? | Everything that depends on it, hop by hop, in any language |
+| Review a pull request | What did this change touch? | Each function the diff added, changed, or deleted, and who uses it |
+| Find your way around a new repo | Where does it start? | The entry points and the code most things depend on, in two calls |
+| Look for something you can't name | Where does X live? | Matches by name, by typo, or by words in a docstring |
+
+When the map can't see something (code reached only through dynamic dispatch,
+or names built from strings), it says so instead of guessing.
 
 ## Get started
 
@@ -70,24 +82,30 @@ tool only reads. Maps live in `~/.cache/codepulse/`, so asking never writes
 into your repo. (`codepulse .` keeps that repo's map in `.codepulse/`,
 ignored by git.)
 
-## Can you trust it?
+## How it's tested
 
-**It's fresh.** Save a file, and the next answer includes it.
+Three kinds of check, all in this repo, all runnable without an API key.
 
-**It's honest.** It only claims what it can prove. A function called only
-through dynamic dispatch shows "nothing on the map calls this", not a guess.
-When two things share a name, the answer says so and names the other one.
-
-**It's measured.** Take 500 real bug reports from
-[SWE-bench Verified](https://www.swebench.com/), and ask which files the fix
-had to change, given only the issue text. The map plus keyword search puts
-the right file first more often than keyword search alone. On its own, the
-map is worse.
+**Against real bugs.** Take 500 real bug reports from
+[SWE-bench Verified](https://www.swebench.com/). Given only the issue text,
+does the map point at the files the actual fix changed? It's compared with
+keyword search (BM25), with 95% intervals:
 
 ![Difference from keyword search with 95% intervals. Map plus keyword search: right file ranked first +0.046, better. Map alone: right file in top 10 −0.119, worse](docs/img/proof.svg)
 
-The method, and what it doesn't show, is in [How I tested it](docs/HOW_I_TESTED.md).
-That benchmark is all Python, so the cross-language edges aren't measured yet.
+- **Works:** the map plus keyword search puts the right file first 13% more often.
+- **Doesn't:** on its own, the map is worse than keyword search.
+- **Not measured yet:** the benchmark is all Python, so cross-language edges
+  aren't scored.
+
+**Against every language.** Each recipe ships with a small fixture repo and a
+list of edges it must produce. A recipe that can't prove its edges fails the
+test suite.
+
+**Against these docs.** Every answer this README shows for `examples/shop` is
+asserted by a test, so the docs can't drift from the product.
+
+The whole method, including what went against it: **[How I tested it](docs/HOW_I_TESTED.md)**.
 
 ## Languages
 
