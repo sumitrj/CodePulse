@@ -15,7 +15,6 @@ dependencies = [
 Homepage = "https://github.com/sumitrj/CodePulse"
 
 [project.optional-dependencies]
-llm = ["anthropic>=0.60", "pydantic>=2"]
 dev = ["pytest"]
 
 [project.scripts]

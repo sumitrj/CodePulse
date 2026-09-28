@@ -1,7 +1,7 @@
 # Recipe system — languages as data
 
 ## Intent
-A language is authored, not engineered. A *recipe* is a YAML file declaring what counts as an entity in one language, what counts as a reference, and how references resolve — via tree-sitter queries plus a small fixed vocabulary of resolution strategies the engine implements generically. The engine is language-blind: adding a language is adding a file. The first recipe (`recipes/python.yml`) reproduces the hand-written extractor's behavior (specs/relationships/SPEC.md); a toy second recipe (yaml keys) proves the engine never learned Python. Everything lands in SQLite with provenance: every row remembers which recipe version put it there. LLM calls, when they arrive in later slices, go through litellm (default: local Ollama) — no LLM is involved in extraction.
+A language is authored, not engineered. A *recipe* is a YAML file declaring what counts as an entity in one language, what counts as a reference, and how references resolve — via tree-sitter queries plus a small fixed vocabulary of resolution strategies the engine implements generically. The engine is language-blind: adding a language is adding a file. The first recipe (`recipes/python.yml`) reproduced the first version's hand-written extractor; a toy second recipe (yaml keys) proves the engine never learned Python. Everything lands in SQLite with provenance: every row remembers which recipe version put it there. LLM calls, when they arrive in later slices, go through litellm (default: local Ollama) — no LLM is involved in extraction.
 
 ## Interface
 ```python
