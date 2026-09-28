@@ -6,6 +6,16 @@ CodePulse answers *where* — so the only question worth being graded on is
 whether "where" is right. This is the whole method, including the parts that
 went against me.
 
+## The short version
+
+| | Result on 500 real bugs (SWE-bench Verified) |
+|---|---|
+| **Map + keyword search** | Right file ranked first 13% more often than keyword search alone. Established: the 95% interval excludes zero. |
+| **Map + keyword search, top 10** | No measurable difference from keyword search. |
+| **Map alone** | Worse than keyword search. The map earns its place combined, not as a replacement. |
+| **Exact function** | On average, 38% of the functions a fix edited appear in the map's top 20. Keyword search ranks files, not functions, so there is nothing to compare against. |
+| **Not measured** | Cross-language edges (the benchmark is all Python) and whether agents fix more bugs. |
+
 Everything below reproduces with two commands and no API key:
 
 ```bash
