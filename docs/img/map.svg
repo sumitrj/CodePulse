@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 300" width="860" height="300" role="img" aria-labelledby="t d">
+<title id="t">The map of examples/shop</title>
+<desc id="d">Six files in five languages. A Dockerfile copies app.py; index.html loads cart.ts; checkout in app.py calls total in billing.py; save_order in app.py reads the DB_URL variable declared in infra.tf.</desc>
+<style>
+  svg { --bg:#ffffff; --ink:#0b0b0b; --ink2:#52514e; --line:#b9b8b2; --card:#fcfcfb; --edge:#8a8983; --x:#2a78d6; }
+  @media (prefers-color-scheme: dark) { svg { --bg:#0d1117; --ink:#f0f0ee; --ink2:#a9a8a0; --line:#3b3b38; --card:#161b22; --edge:#7a7973; --x:#58a0f0; } }
+  .bg { fill: var(--bg); }
+  .card { fill: var(--card); stroke: var(--ink); stroke-width: 1.5; }
+  .rule { stroke: var(--line); stroke-width: 1; }
+  .file { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; fill: var(--ink); }
+  .tag { font: 11px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink2); letter-spacing: .04em; }
+  .ent { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; fill: var(--ink); }
+  .kind { font: 11px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink2); }
+  .e { fill: none; stroke: var(--edge); stroke-width: 1.5; }
+  .ex { fill: none; stroke: var(--x); stroke-width: 2; }
+  .lbl { font: 11.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink2); paint-order: stroke; stroke: var(--bg); stroke-width: 5px; }
+  .lblx { font: 600 11.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--x); paint-order: stroke; stroke: var(--bg); stroke-width: 5px; }
+  .key { font: 11.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink2); }
+  .dot { fill: var(--edge); }
+  .dotx { fill: var(--x); }
+</style>
+<rect class="bg" width="860" height="300"/>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--edge)"/></marker>
+  <marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--x)"/></marker>
+</defs>
+
+<!-- column A -->
+<rect class="card" x="20" y="20" width="190" height="62"/>
+<text class="file" x="32" y="42">Dockerfile</text><text class="tag" x="198" y="42" text-anchor="end">DOCKER</text>
+<line class="rule" x1="20" y1="52" x2="210" y2="52"/>
+<text class="ent" x="32" y="71">COPY app.py billing.py</text>
+
+<rect class="card" x="20" y="196" width="190" height="62"/>
+<text class="file" x="32" y="218">web/index.html</text><text class="tag" x="198" y="218" text-anchor="end">HTML</text>
+<line class="rule" x1="20" y1="228" x2="210" y2="228"/>
+<text class="ent" x="32" y="247">&lt;script src&gt;</text>
+
+<!-- column B -->
+<rect class="card" x="335" y="20" width="200" height="112"/>
+<text class="file" x="347" y="42">app.py</text><text class="tag" x="523" y="42" text-anchor="end">PYTHON</text>
+<line class="rule" x1="335" y1="52" x2="535" y2="52"/>
+<text class="ent" x="347" y="71">checkout</text><text class="kind" x="523" y="71" text-anchor="end">function</text>
+<text class="ent" x="347" y="95">save_order</text><text class="kind" x="523" y="95" text-anchor="end">function</text>
+<text class="ent" x="347" y="119">main</text><text class="kind" x="523" y="119" text-anchor="end">entry point</text>
+
+<rect class="card" x="335" y="196" width="200" height="62"/>
+<text class="file" x="347" y="218">web/cart.ts</text><text class="tag" x="523" y="218" text-anchor="end">TYPESCRIPT</text>
+<line class="rule" x1="335" y1="228" x2="535" y2="228"/>
+<text class="ent" x="347" y="247">cartTotal</text><text class="kind" x="523" y="247" text-anchor="end">function</text>
+
+<!-- column C -->
+<rect class="card" x="650" y="20" width="190" height="88"/>
+<text class="file" x="662" y="42">billing.py</text><text class="tag" x="828" y="42" text-anchor="end">PYTHON</text>
+<line class="rule" x1="650" y1="52" x2="840" y2="52"/>
+<text class="ent" x="662" y="71">total</text><text class="kind" x="828" y="71" text-anchor="end">function</text>
+<text class="ent" x="662" y="95">subtotal</text><text class="kind" x="828" y="95" text-anchor="end">function</text>
+
+<rect class="card" x="650" y="150" width="190" height="62"/>
+<text class="file" x="662" y="172">infra.tf</text><text class="tag" x="828" y="172" text-anchor="end">TERRAFORM</text>
+<line class="rule" x1="650" y1="182" x2="840" y2="182"/>
+<text class="ent" x="662" y="201">DB_URL</text><text class="kind" x="828" y="201" text-anchor="end">variable</text>
+
+<!-- edges -->
+<path class="ex" d="M210,67 C270,67 275,37 333,37" marker-end="url(#ax)"/>
+<text class="lblx" x="272" y="47" text-anchor="middle">copies</text>
+
+<path class="ex" d="M210,243 L333,243" marker-end="url(#ax)"/>
+<text class="lblx" x="272" y="237" text-anchor="middle">loads</text>
+
+<path class="e" d="M535,67 L648,67" marker-end="url(#a)"/>
+<text class="lbl" x="592" y="61" text-anchor="middle">calls</text>
+
+<path class="ex" d="M535,91 C600,91 590,197 648,197" marker-end="url(#ax)"/>
+<text class="lblx" x="592" y="150" text-anchor="middle">reads env</text>
+
+
+<!-- key -->
+<rect class="dot" x="20" y="281" width="14" height="2"/><text class="key" x="40" y="286">same language</text>
+<rect class="dotx" x="150" y="281" width="14" height="2"/><text class="key" x="170" y="286">across languages — the edges a one-language tool can't see</text>
+</svg>

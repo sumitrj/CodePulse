@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 190" width="860" height="190" role="img" aria-labelledby="t d">
+<title id="t">One map, two readers</title>
+<desc id="d">You read the map in an editor panel; your AI agent reads it through MCP tools. Asked what breaks if DB_URL changes, both get the same answer: save_order, then checkout, then main.</desc>
+<style>
+  svg { --bg:#ffffff; --ink:#0b0b0b; --ink2:#52514e; --card:#fcfcfb; --edge:#8a8983; --x:#2a78d6; --inv:#ffffff; }
+  @media (prefers-color-scheme: dark) { svg { --bg:#0d1117; --ink:#f0f0ee; --ink2:#a9a8a0; --card:#161b22; --edge:#7a7973; --x:#58a0f0; --inv:#0d1117; } }
+  .bg { fill: var(--bg); }
+  .card { fill: var(--card); stroke: var(--ink); stroke-width: 1.5; }
+  .core { fill: var(--ink); }
+  .h { font: 600 15px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
+  .hi { font: 600 15px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--inv); }
+  .s { font: 12.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink2); }
+  .si { font: 12.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--inv); opacity: .8; }
+  .q { font: 13px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink2); }
+  .a { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; fill: var(--x); }
+  .e { fill: none; stroke: var(--edge); stroke-width: 1.5; }
+</style>
+<rect class="bg" width="860" height="190"/>
+<defs><marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--edge)"/></marker></defs>
+
+<rect class="card" x="20" y="20" width="230" height="76"/>
+<text class="h" x="36" y="50">You</text>
+<text class="s" x="36" y="74">click in the editor panel</text>
+
+<rect class="core" x="315" y="20" width="230" height="76"/>
+<text class="hi" x="430" y="50" text-anchor="middle">the map</text>
+<text class="si" x="430" y="74" text-anchor="middle">refreshed before every answer</text>
+
+<rect class="card" x="610" y="20" width="230" height="76"/>
+<text class="h" x="626" y="50">Your AI agent</text>
+<text class="s" x="626" y="74">calls it as a tool, over MCP</text>
+
+<path class="e" d="M313,58 L252,58" marker-end="url(#m)"/>
+<path class="e" d="M547,58 L608,58" marker-end="url(#m)"/>
+
+<text class="q" x="430" y="136" text-anchor="middle">Both ask “what breaks if I change DB_URL?” — both get:</text>
+<text class="a" x="430" y="164" text-anchor="middle">save_order → checkout → main</text>
+</svg>

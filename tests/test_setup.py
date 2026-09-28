@@ -1,22 +1,22 @@
 """
-Tests for setup.sh. Maps 1:1 to acceptance criteria in specs/setup/SPEC.md.
-Red until setup.sh and skill/SKILL.md exist. Runs the real script.
+Tests for `codepulse <repo>` wiring. Maps 1:1 to acceptance criteria in
+specs/setup/SPEC.md. Runs the real command.
 """
 import json
 import sqlite3
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SETUP = ROOT / "setup.sh"
 
 
 def run_setup(repo: Path):
     return subprocess.run(
-        ["bash", str(SETUP), str(repo)],
-        capture_output=True, text=True, timeout=120,
+        [sys.executable, "-m", "codepulse", str(repo), "--no-panel"],
+        capture_output=True, text=True, timeout=120, cwd=ROOT,
     )
 
 
@@ -42,9 +42,8 @@ def test_mcp_json_has_codepulse_server_with_absolute_paths(wired):
     data = json.loads((wired / ".mcp.json").read_text())
 
     server = data["mcpServers"]["codepulse"]
-    assert server["command"] == str(ROOT / ".venv" / "bin" / "python")
-    assert str(wired) in server["args"]
-    assert "serve-mcp" in server["args"]
+    assert Path(server["command"]).is_absolute()
+    assert server["args"][-3:] == ["serve-mcp", "--root", str(wired.resolve())]
 
 
 # === AC2: an existing .mcp.json survives the merge ===

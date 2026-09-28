@@ -1,7 +1,7 @@
 {
   "name": "codepulse",
   "displayName": "CodePulse",
-  "description": "One map, two readers, six questions — your repo's entity-relation graph, for you and your agents.",
+  "description": "A live map of your repo, for you and your AI coding agent.",
   "version": "0.1.0",
   "publisher": "sumitrj",
   "license": "MIT",
