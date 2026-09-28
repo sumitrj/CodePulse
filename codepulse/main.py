@@ -16,7 +16,7 @@ import sys
 import time
 from pathlib import Path
 
-from .engine import Engine
+from .engine import MODULE_SCOPE, SCOPES, Engine
 from .mcp_server import tool_names
 from .recipes import builtin_recipes
 
@@ -172,9 +172,12 @@ def build_engine(root: Path, announce: bool = True) -> Engine:
     started = time.time()
     report = engine.refresh()
     if announce:
-        entities = engine.db.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
-        print(f"  map   : {len(report.extracted)} files indexed, "
-              f"{entities} entities ({time.time() - started:.1f}s)")
+        entities = engine.db.execute(
+            "SELECT COUNT(*) FROM entities WHERE name NOT IN (?, ?)", SCOPES).fetchone()[0]
+        files = engine.db.execute(
+            "SELECT COUNT(*) FROM entities WHERE name=?", (MODULE_SCOPE,)).fetchone()[0]
+        print(f"  map   : {files} files, {entities} entities "
+              f"({len(report.extracted)} read just now, {time.time() - started:.1f}s)")
         if report.failed:
             shown = ", ".join(report.failed[:4]) + (" …" if len(report.failed) > 4 else "")
             print(f"  skip  : {len(report.failed)} file(s) the recipes couldn't parse: {shown}")

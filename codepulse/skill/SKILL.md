@@ -5,7 +5,7 @@ description: Answer structural questions about a codebase from its CodePulse map
 
 # CodePulse — ask the map, don't rebuild it
 
-A CodePulse map is a live entity-relation graph of the repo — Python,
+A CodePulse map is a live map of the repo: every function, class, and config key, and what touches what — Python,
 TypeScript/TSX, YAML, Dockerfile, Terraform, HTML — refreshed on every call. It
 already knows the structure you would otherwise re-derive by reading files.
 Asking it is one tool call; grepping is many. Prefer the map.
