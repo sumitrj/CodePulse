@@ -6,13 +6,13 @@ description: Answer structural questions about a codebase from its CodePulse map
 # CodePulse — ask the map, don't rebuild it
 
 A CodePulse map is a live entity-relation graph of the repo — Python,
-TypeScript, YAML, Dockerfile, Terraform, HTML — refreshed on every call. It
+TypeScript/TSX, YAML, Dockerfile, Terraform, HTML — refreshed on every call. It
 already knows the structure you would otherwise re-derive by reading files.
 Asking it is one tool call; grepping is many. Prefer the map.
 
 **If the `pulse_*` tools are not in this session:** the repo isn't wired yet.
-Say so and offer the setup — `path/to/CodePulse/setup.sh <this repo>`, then
-restart the session — before doing any large-scale exploration by hand.
+Say so and offer the setup — `uv tool install git+https://github.com/sumitrj/CodePulse`
+then `codepulse install` (once per machine), then restart the session — before doing any large-scale exploration by hand.
 
 ## The tools
 
@@ -24,7 +24,12 @@ restart the session — before doing any large-scale exploration by hand.
 | `pulse_radius name` | What breaks if this changes (transitive, with hop depth) |
 | `pulse_locate words` | Where something lives, by name/path tokens |
 | `pulse_changed [paths]` | What a diff touched + who is at risk (defaults to git-modified) |
+| `pulse_delta [base]` | Per-entity PR delta: added/modified/deleted, each with its radius |
 | `pulse_handlers` | Estimated entry points: uncalled roots with downstream reach |
+
+Every tool takes an optional `repo` (absolute path to a repo, or anything inside it).
+Omit it for the session's own repo; pass it to ask about another repo without changing
+directory. If a call says the working directory isn't a repo, retry with `repo`.
 
 Names: bare (`get_env`), method (`Cart.checkout`), or pinned (`path/to/file.py::name`).
 Config keys, Terraform variables, and YAML keys are entities too — `pulse_who DB_URL` works.

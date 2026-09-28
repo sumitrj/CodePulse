@@ -1,24 +1,54 @@
-# Python recipe — parity with the hand-written extractor (specs/relationships/SPEC.md).
+# Python recipe — parity with the hand-written extractor (specs/relationships/SPEC.md),
+# plus the relationships the audit found missing (specs/coverage/SPEC.md).
 # The engine knows none of this; a language is this file.
 name: python
-version: "4"
+version: "7"
 language: python
 matches: ["*.py"]
 module_suffix: ".py"
+package_index: "__init__"    # pkg/ is a module via pkg/__init__.py
+self_name: "self"            # `self.x` means the enclosing class's x
 
 entities:
   - kind: function
     query: "(function_definition name: (identifier) @name) @node"
   - kind: class
     query: "(class_definition name: (identifier) @name) @node"
+  # Module and class state. No @node on purpose: one statement can bind several
+  # names (`a, b = ...`, `x = y = ...`) and if the entity's span were the whole
+  # statement the second name would nest inside the first and come out `x.y`.
+  # The name *is* the entity here, so the name node is its span.
   - kind: state
-    query: "(module (assignment left: (identifier) @name) @node)"
+    query: "(module (assignment left: (identifier) @name))"
+  - kind: state
+    query: "(module (assignment left: (pattern_list (identifier) @name)))"
+  - kind: state
+    query: "(module (assignment right: (assignment left: (identifier) @name)))"
+  # class-level assignments — `K.attr`, which is what `self.attr` reaches
+  - kind: state
+    query: "(class_definition body: (block (assignment left: (identifier) @name)))"
 
 docs:
   # docstrings attach to whichever entity encloses them
   # (this grammar parses a docstring as a direct string child of the block)
   - query: "(function_definition body: (block . (string (string_content) @doc)))"
+    kind: docstring
   - query: "(class_definition body: (block . (string (string_content) @doc)))"
+    kind: docstring
+  # the module docstring — the one line that says what a whole file is for.
+  # At module level the grammar leaves the string bare, with no enclosing
+  # expression_statement (unlike inside a body). Not anchored to the first
+  # child either: a shebang or licence comment often comes first, and the
+  # docstring is still the docstring.
+  - query: "(module (string (string_content) @doc))"
+    kind: docstring
+    scope: true
+  # `# ...` lines immediately above a definition. Most code carries no
+  # docstring; this is where its author actually wrote things down.
+  - query: "(comment) @doc"
+    attach: preceding
+    kind: leading
+    scope: true
 
 bindings:
   # import m
@@ -33,19 +63,58 @@ bindings:
   - query: "(import_from_statement module_name: (relative_import) @module name: (dotted_name) @member)"
   # from .m import n as x
   - query: "(import_from_statement module_name: (relative_import) @module name: (aliased_import name: (dotted_name) @member alias: (identifier) @alias))"
+  # from m import *  — binds every name m exports, so bare calls still resolve
+  - star: true
+    query: "(import_from_statement module_name: [(dotted_name) (relative_import)] @module (wildcard_import))"
 
 references:
   - kind: calls
     query: "(call function: (_) @target)"
+  # a decorator is called at definition time, by the thing it decorates —
+  # which is written *underneath* it, hence attach: following
+  - kind: calls
+    query: "(decorator [(identifier) @target (attribute) @target (call function: (_) @target)]) @node"
+    attach: following
   - kind: inherits
     query: "(class_definition superclasses: (argument_list (_) @target))"
   - kind: reads
     query: "(identifier) @target"
     only: [state]
     unresolved: drop
+  # `lib.LIMIT`, `self.attr` — state reached through an attribute. A write also
+  # names its target this way, so a written state reads as touched too; both
+  # claims are true of the statement.
+  - kind: reads
+    query: "(attribute) @target"
+    only: [state]
+    unresolved: drop
+  # a class named in argument position — isinstance(x, Base), register(Base)
+  - kind: reads
+    query: "(call arguments: (argument_list [(identifier) @target (tuple (identifier) @target)]))"
+    only: [class]
+    unresolved: drop
+  # exception flow: raise Err / except Err / except (A, B) as e
+  - kind: reads
+    query: "(raise_statement (identifier) @target)"
+    only: [class]
+    unresolved: drop
+  - kind: reads
+    query: "(except_clause value: [(identifier) @target (as_pattern (identifier) @target) (tuple (identifier) @target)])"
+    only: [class]
+    unresolved: drop
   - kind: writes
     query: "(global_statement (identifier) @target)"
     only: [state]
+    unresolved: drop
+  - kind: writes
+    query: "[(assignment left: (attribute) @target) (augmented_assignment left: (attribute) @target)]"
+    only: [state]
+    unresolved: drop
+  # annotations name a type; one level of generic is enough for `list[Base]`
+  # because the grammar wraps each parameter in its own (type) node.
+  - kind: types
+    query: "(type (identifier) @target)"
+    only: [class]
     unresolved: drop
   # the convention edge: a string subscript may name a config entity
   # (os.environ["DB_URL"] -> terraform variable / yaml key of that name)

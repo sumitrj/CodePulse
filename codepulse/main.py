@@ -1,8 +1,9 @@
 """The codepulse command — one noun, one motion.
 
+    codepulse install      once per machine: the map in every repo, any working dir
     codepulse .            wire this repo, build the map, start the panel
     codepulse <path>       same, for any repo
-    codepulse serve-mcp --root <path>   what .mcp.json invokes (agents)
+    codepulse serve-mcp [--root <path>]   what Claude Code invokes (agents)
 
 Wiring is idempotent: .mcp.json merged (never clobbered), the Claude skill
 installed, .codepulse/ kept out of git. See specs/setup/SPEC.md.
@@ -10,11 +11,13 @@ installed, .codepulse/ kept out of git. See specs/setup/SPEC.md.
 import argparse
 import json
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 from .engine import Engine
+from .mcp_server import tool_names
 from .recipes import builtin_recipes
 
 
@@ -23,13 +26,54 @@ def _skill_source() -> Path | None:
     return SKILL_PATH if SKILL_PATH.is_file() else None
 
 
-def _mcp_command(root: Path) -> dict:
-    """Prefer the codepulse executable if it's on PATH; else this interpreter."""
+def _mcp_command(root: Path | None = None) -> dict:
+    """Prefer the codepulse executable if it's on PATH; else this interpreter.
+    No root means the server follows each call's `repo`, else its launch dir."""
+    pin = ["--root", str(root)] if root else []
     exe = shutil.which("codepulse")
     if exe:
-        return {"command": exe, "args": ["serve-mcp", "--root", str(root)]}
-    return {"command": sys.executable,
-            "args": ["-m", "codepulse", "serve-mcp", "--root", str(root)]}
+        return {"command": exe, "args": ["serve-mcp", *pin]}
+    return {"command": sys.executable, "args": ["-m", "codepulse", "serve-mcp", *pin]}
+
+
+# Read-only shell the skill's documented fallbacks need. Deliberately short:
+# everything that writes, and every other command, still stops for a human.
+_SAFE_BASH = ("Bash(git diff:*)", "Bash(git status:*)")
+
+
+def _permission_rules() -> list[str]:
+    return [f"mcp__codepulse__{name}" for name in tool_names()] + list(_SAFE_BASH)
+
+
+def _wire_permissions(target: Path) -> None:
+    """Pre-approve the read-only verbs.
+
+    A map you must approve once per verb per task costs more attention than the
+    greps it replaced. Merge, never clobber: we only ever add entries the file
+    is missing, so a hand-tuned allowlist survives re-wiring untouched.
+    """
+    if target.exists():
+        try:
+            data = json.loads(target.read_text())
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"  perms : skipped — {target} is unreadable ({exc}); "
+                  f"add these yourself: {', '.join(_permission_rules())}")
+            return
+    else:
+        data = {}
+
+    allow = data.setdefault("permissions", {}).setdefault("allow", [])
+    if not isinstance(allow, list):
+        print(f"  perms : skipped — permissions.allow in {target} is not a list")
+        return
+    added = [rule for rule in _permission_rules() if rule not in allow]
+    if not added:
+        print(f"  perms : already allowed ({len(tool_names())} read-only verbs)")
+        return
+    allow.extend(added)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+    print(f"  perms : {len(added)} rule(s) pre-approved in {target}")
 
 
 def wire(root: Path) -> None:
@@ -38,6 +82,8 @@ def wire(root: Path) -> None:
     data.setdefault("mcpServers", {})["codepulse"] = _mcp_command(root)
     target.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
     print(f"  mcp   : {target}")
+
+    _wire_permissions(root / ".claude" / "settings.json")
 
     skill = _skill_source()
     if skill:
@@ -53,6 +99,38 @@ def wire(root: Path) -> None:
         if ".codepulse/" not in lines:
             exclude.write_text("\n".join([*lines, ".codepulse/"]) + "\n")
         print("  git   : .codepulse/ locally ignored")
+
+
+def install(home: Path | None = None) -> None:
+    """User-level wiring: one MCP registration, skill, and allowlist in
+    ~/.claude, so every Claude Code session has the map whatever its working
+    directory. The server picks the repo per call; nothing is written into
+    any repo until you run `codepulse <repo>` for its panel."""
+    home = home or Path.home()
+    command = _mcp_command()
+    claude = shutil.which("claude")
+    add = ["mcp", "add", "--scope", "user", "codepulse", "--", command["command"], *command["args"]]
+    if claude:
+        subprocess.run([claude, "mcp", "remove", "--scope", "user", "codepulse"],
+                       capture_output=True)            # re-install replaces, never duplicates
+        res = subprocess.run([claude, *add], capture_output=True, text=True)
+        if res.returncode == 0:
+            print("  mcp   : registered at user scope (all repos)")
+        else:
+            print(f"  mcp   : `claude mcp add` failed: {res.stderr.strip() or res.stdout.strip()}")
+    else:
+        print("  mcp   : claude CLI not on PATH — run this yourself:")
+        print("          claude " + " ".join(add))
+
+    _wire_permissions(home / ".claude" / "settings.json")
+
+    skill = _skill_source()
+    if skill:
+        dest = home / ".claude" / "skills" / "codepulse" / "SKILL.md"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(skill.read_text())
+        print(f"  skill : {dest}")
+    print("done. Start Claude Code anywhere; pass repo=<path> to ask about another repo.")
 
 
 _IGNORE_SCAFFOLD = """\
@@ -97,6 +175,9 @@ def build_engine(root: Path, announce: bool = True) -> Engine:
         entities = engine.db.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
         print(f"  map   : {len(report.extracted)} files indexed, "
               f"{entities} entities ({time.time() - started:.1f}s)")
+        if report.failed:
+            shown = ", ".join(report.failed[:4]) + (" …" if len(report.failed) > 4 else "")
+            print(f"  skip  : {len(report.failed)} file(s) the recipes couldn't parse: {shown}")
         hint = root / ".codepulse" / "ignore"
         if len(report.extracted) > 5000:
             print(f"  hint  : large repo — add directory names to {hint} (one per line) to scope the map")
@@ -108,15 +189,22 @@ def main(argv: list[str] | None = None) -> None:
 
     if argv and argv[0] == "serve-mcp":   # the agent surface, invoked by .mcp.json
         mcp = argparse.ArgumentParser(prog="codepulse serve-mcp")
-        mcp.add_argument("--root", default=".", help="repo root")
+        mcp.add_argument("--root", default=None,
+                         help="default repo when a call names none "
+                              "(default: the directory the client launched us in)")
         opts = mcp.parse_args(argv[1:])
         from .mcp_server import serve
-        serve(Path(opts.root).resolve())
+        serve(Path(opts.root).resolve() if opts.root else None)
+        return
+
+    if argv == ["install"]:               # a folder named install: `codepulse ./install`
+        install()
         return
 
     parser = argparse.ArgumentParser(
         prog="codepulse",
         description="One live map of your repo, for you and your agents. "
+                    "codepulse install registers the map for every repo (once per machine); "
                     "codepulse <path> wires the repo, builds the map, starts the panel; "
                     "codepulse serve-mcp --root <path> is what .mcp.json runs.")
     parser.add_argument("path", nargs="?", default=".",

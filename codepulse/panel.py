@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import boards, six
-from .engine import Engine
+from .engine import MODULE_SCOPE, PACKAGE_SCOPE, Engine
 from .recipes import builtin_recipes
 
 _WEBVIEW = Path(__file__).parent / "webview" / "panel.html"
@@ -48,8 +48,10 @@ def answer(engine: Engine, verb: str, arg: str) -> str:
 def tree(engine: Engine) -> dict:
     files: dict[str, list] = {}
     for entity in engine.entities():
+        if entity.addr.name == PACKAGE_SCOPE:        # a folder, not a file
+            continue
         files.setdefault(entity.addr.path, [])
-        if entity.addr.name != "<module>":
+        if entity.addr.name != MODULE_SCOPE:
             files[entity.addr.path].append(
                 {"name": entity.addr.name, "kind": entity.kind, "line": entity.line}
             )

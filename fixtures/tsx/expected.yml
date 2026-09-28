@@ -1,0 +1,6 @@
+- src: App.tsx:App
+  kind: calls
+  dst: Button.tsx:Button
+- src: App.tsx:<module>
+  kind: imports
+  dst: Button.tsx:Button

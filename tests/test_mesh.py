@@ -159,6 +159,27 @@ def test_dangling_path_reference_is_dropped(tmp_path):
     assert edges == []
 
 
+def test_an_unaskable_path_reference_does_not_take_the_index_down(tmp_path):
+    """Regression: django's admindocs template puts a 250-character
+    `javascript:(function(){…})()` bookmarklet in an href. Asking the
+    filesystem whether that is a file raises ENAMETOOLONG, which used to
+    abort the whole index — `codepulse .` could not map django at all."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    bookmarklet = "javascript:(function(){" + "x" * 300 + "})()"
+    (repo / "index.html").write_text(
+        f'<html><a href="{bookmarklet}">bookmark</a>'
+        f'<script src="app.ts"></script></html>\n')
+    (repo / "app.ts").write_text("export function go() { return 1; }\n")
+    engine = Engine(tmp_path / "pulse.db", builtin_recipes(), root=repo)
+
+    engine.apply()          # must not raise
+
+    # and the legitimate reference alongside it still resolves
+    loads = engine.outgoing(Addr("index.html", "<module>"), kind="loads")
+    assert any(getattr(e.dst, "path", None) == "app.ts" for e in loads)
+
+
 # === Traceability ===
 # AC1: test_recipe_passes_its_fixture (x6 recipes)
 # AC2: test_yaml_nested_keys_get_dotted_names

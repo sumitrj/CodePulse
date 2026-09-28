@@ -1,0 +1,124 @@
+# TSX recipe — typescript.yml plus JSX. A separate file because tree-sitter
+# ships tsx as its own grammar, so every query has to be compiled against it;
+# keep the two in step when either changes.
+name: tsx
+version: "1"
+language: tsx
+matches: ["*.tsx"]
+module_suffix: ".tsx"
+package_index: "index"       # dir/ is a module via dir/index.tsx
+self_name: "this"            # `this.x` means the enclosing class's x
+
+docs:
+  # TS has no docstring: every comment, JSDoc or not, sits *above* the thing it
+  # describes, so both rules attach by position rather than by enclosure.
+  # JSDoc outranks a plain comment when a declaration carries both.
+  - query: "((comment) @doc (#match? @doc \"^/[*][*]\"))"
+    attach: preceding
+    kind: jsdoc
+    scope: true
+  - query: "(comment) @doc"
+    attach: preceding
+    kind: leading
+    scope: true
+
+entities:
+  - kind: function
+    query: "(function_declaration name: (identifier) @name) @node"
+  - kind: function
+    query: "(generator_function_declaration name: (identifier) @name) @node"
+  - kind: class
+    query: "(class_declaration name: (type_identifier) @name) @node"
+  # an abstract class is still a class — and without this rule its methods have
+  # no enclosing entity and come out as orphans with unqualified names
+  - kind: class
+    query: "(abstract_class_declaration name: (type_identifier) @name) @node"
+  - kind: method
+    query: "(method_definition name: (property_identifier) @name) @node"
+  - kind: method
+    query: "(method_signature name: (property_identifier) @name) @node"
+  - kind: interface
+    query: "(interface_declaration name: (type_identifier) @name) @node"
+  - kind: type
+    query: "(type_alias_declaration name: (type_identifier) @name) @node"
+  - kind: enum
+    query: "(enum_declaration name: (identifier) @name) @node"
+  - kind: state
+    query: "(enum_declaration body: (enum_body [name: (property_identifier) @name (enum_assignment name: (property_identifier) @name)]))"
+  # `const f = () => …` is a function, not state. It must be claimed before the
+  # state rule below: overlapping rules are settled first-rule-wins.
+  - kind: function
+    query: "((lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function))) @node)"
+  # top-level const/let/var, exported or not — the module's state
+  - kind: state
+    query: |
+      (program [
+        (lexical_declaration (variable_declarator name: (identifier) @name))
+        (variable_declaration (variable_declarator name: (identifier) @name))
+        (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @name)))
+        (export_statement declaration: (variable_declaration (variable_declarator name: (identifier) @name)))
+      ])
+
+bindings:
+  # import { x } from "./m"
+  - style: path
+    query: "(import_statement (import_clause (named_imports (import_specifier name: (identifier) @member))) source: (string (string_fragment) @module))"
+  # import x from "./m"
+  - style: path
+    query: "(import_statement (import_clause (identifier) @alias) source: (string (string_fragment) @module))"
+  # import * as ns from "./m"
+  - style: path
+    query: "(import_statement (import_clause (namespace_import (identifier) @alias)) source: (string (string_fragment) @module))"
+  # import "./m" — side effect only; the anchor is what makes it "no clause"
+  - style: path
+    query: "(import_statement . (string (string_fragment) @module))"
+  # export { x } from "./m" — a re-export the chaser can follow
+  - style: path
+    query: "(export_statement (export_clause (export_specifier name: (identifier) @member)) source: (string (string_fragment) @module))"
+  # export * from "./m"
+  - style: path
+    star: true
+    query: "(export_statement . (string (string_fragment) @module))"
+
+references:
+  - kind: calls
+    query: "(call_expression function: (_) @target)"
+  # `new Foo()` runs Foo's constructor — the same coupling a call is
+  - kind: calls
+    query: "(new_expression constructor: (_) @target)"
+  - kind: inherits
+    query: "(class_heritage (extends_clause value: (_) @target))"
+  - kind: implements
+    query: "(class_heritage (implements_clause (type_identifier) @target))"
+  - kind: reads
+    query: "(identifier) @target"
+    only: [state]
+    unresolved: drop
+  # `ns.VALUE` — state reached through a namespace import or an object
+  - kind: reads
+    query: "(member_expression) @target"
+    only: [state]
+    unresolved: drop
+  - kind: writes
+    query: "[(assignment_expression left: (_) @target) (augmented_assignment_expression left: (_) @target)]"
+    only: [state]
+    unresolved: drop
+  # `: Shape` — an annotation names a type contract; one level of generic
+  # covers `Array<Shape>`
+  - kind: types
+    query: "(type_annotation (type_identifier) @target)"
+    only: [interface, class, type, enum]
+    unresolved: drop
+  - kind: types
+    query: "(type_arguments (type_identifier) @target)"
+    only: [interface, class, type, enum]
+    unresolved: drop
+  # <Widget /> renders a component — the JSX spelling of calling it
+  - kind: calls
+    query: "(jsx_opening_element name: [(identifier) (member_expression)] @target)"
+    only: [function, class]
+    unresolved: drop
+  - kind: calls
+    query: "(jsx_self_closing_element name: [(identifier) (member_expression)] @target)"
+    only: [function, class]
+    unresolved: drop
