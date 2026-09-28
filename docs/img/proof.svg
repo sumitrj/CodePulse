@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 300" width="860" height="300" role="img" aria-labelledby="t d">
+<title id="t">Against keyword search, 500 real bug reports</title>
+<desc id="d">Difference from BM25 keyword search on SWE-bench Verified, with 95% intervals. Map plus keyword search: right file ranked first, +0.046, interval +0.008 to +0.084, better. Right file in top ten, +0.006, interval −0.029 to +0.041, no difference. Map alone: right file first, −0.030, interval −0.077 to +0.017, no difference. Right file in top ten, −0.119, interval −0.163 to −0.076, worse.</desc>
+<style>
+  svg { --bg:#ffffff; --ink:#0b0b0b; --ink2:#52514e; --ink3:#8a8983; --grid:#e4e3de; --zero:#52514e; --good:#2a78d6; --flat:#a9a8a0; --bad:#e34948; }
+  @media (prefers-color-scheme: dark) { svg { --bg:#0d1117; --ink:#f0f0ee; --ink2:#a9a8a0; --ink3:#7a7973; --grid:#262a30; --zero:#a9a8a0; --good:#58a0f0; --flat:#6b6a65; --bad:#e66767; } }
+  .bg { fill: var(--bg); }
+  .grp { font: 600 13px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
+  .row { font: 13px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink2); }
+  .tick { font: 11px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink3); }
+  .val { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; fill: var(--ink); }
+  .verdict { font: 600 12.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
+  .muted { font: 12.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink3); }
+  .grid { stroke: var(--grid); stroke-width: 1; }
+  .zero { stroke: var(--zero); stroke-width: 1.5; }
+  .ci-good { stroke: var(--good); stroke-width: 2; } .pt-good { fill: var(--good); }
+  .ci-flat { stroke: var(--flat); stroke-width: 2; } .pt-flat { fill: var(--flat); }
+  .ci-bad { stroke: var(--bad); stroke-width: 2; } .pt-bad { fill: var(--bad); }
+</style>
+<rect class="bg" width="860" height="300"/>
+
+<!-- axis: x(v) = 512 + v*1400 over [-0.18, +0.12] -->
+<g>
+  <line class="grid" x1="302" y1="40" x2="302" y2="262"/><line class="grid" x1="372" y1="40" x2="372" y2="262"/>
+  <line class="grid" x1="442" y1="40" x2="442" y2="262"/><line class="grid" x1="582" y1="40" x2="582" y2="262"/>
+  <line class="grid" x1="652" y1="40" x2="652" y2="262"/>
+  <line class="zero" x1="512" y1="40" x2="512" y2="262"/>
+  <text class="tick" x="302" y="280" text-anchor="middle">−0.15</text><text class="tick" x="372" y="280" text-anchor="middle">−0.10</text>
+  <text class="tick" x="442" y="280" text-anchor="middle">−0.05</text><text class="tick" x="512" y="280" text-anchor="middle">0</text>
+  <text class="tick" x="582" y="280" text-anchor="middle">+0.05</text><text class="tick" x="652" y="280" text-anchor="middle">+0.10</text>
+  <text class="tick" x="512" y="28" text-anchor="middle">◀ worse than keyword search · better ▶</text>
+</g>
+
+<text class="grp" x="20" y="64">Map + keyword search</text>
+<text class="row" x="36" y="94">Right file ranked #1</text>
+<line class="ci-good" x1="523" y1="89" x2="630" y2="89"/><line class="ci-good" x1="523" y1="83" x2="523" y2="95"/><line class="ci-good" x1="630" y1="83" x2="630" y2="95"/>
+<circle class="pt-good" cx="576" cy="89" r="5"/>
+<text class="val" x="700" y="94">+0.046</text><text class="verdict" x="760" y="94">better</text>
+
+<text class="row" x="36" y="130">Right file in top 10</text>
+<line class="ci-flat" x1="471" y1="125" x2="569" y2="125"/><line class="ci-flat" x1="471" y1="119" x2="471" y2="131"/><line class="ci-flat" x1="569" y1="119" x2="569" y2="131"/>
+<circle class="pt-flat" cx="520" cy="125" r="5"/>
+<text class="val" x="700" y="130">+0.006</text><text class="muted" x="760" y="130">no difference</text>
+
+<text class="grp" x="20" y="178">Map alone</text>
+<text class="row" x="36" y="208">Right file ranked #1</text>
+<line class="ci-flat" x1="404" y1="203" x2="536" y2="203"/><line class="ci-flat" x1="404" y1="197" x2="404" y2="209"/><line class="ci-flat" x1="536" y1="197" x2="536" y2="209"/>
+<circle class="pt-flat" cx="470" cy="203" r="5"/>
+<text class="val" x="700" y="208">−0.030</text><text class="muted" x="760" y="208">no difference</text>
+
+<text class="row" x="36" y="244">Right file in top 10</text>
+<line class="ci-bad" x1="284" y1="239" x2="406" y2="239"/><line class="ci-bad" x1="284" y1="233" x2="284" y2="245"/><line class="ci-bad" x1="406" y1="233" x2="406" y2="245"/>
+<circle class="pt-bad" cx="345" cy="239" r="5"/>
+<text class="val" x="700" y="244">−0.119</text><text class="verdict" x="760" y="244">worse</text>
+</svg>
