@@ -70,6 +70,14 @@ def _tool_list():
     ]
 
 
+def _version() -> str:
+    try:
+        from importlib.metadata import version
+        return version("codepulse")
+    except Exception:              # running from a source tree that isn't installed
+        return "dev"
+
+
 def tool_names() -> list[str]:
     """Every verb, for installers writing a permission allowlist."""
     return [name for name, *_ in _TOOLS]
@@ -196,7 +204,7 @@ def serve(root: Path | None = None):
             reply(request_id, {
                 "protocolVersion": request.get("params", {}).get("protocolVersion", "2024-11-05"),
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "codepulse", "version": "0.2.0"},
+                "serverInfo": {"name": "codepulse", "version": _version()},
             })
         elif method == "tools/list":
             reply(request_id, {"tools": _tool_list()})
