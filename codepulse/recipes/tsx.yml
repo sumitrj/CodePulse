@@ -1,12 +1,12 @@
-# TypeScript recipe — functions, classes, methods, arrow consts, the type
-# vocabulary (interface / alias / enum) and module state; ./ imports resolve as
-# paths (the engine capability relative Python imports paid for).
-name: typescript
-version: "3"
-language: typescript
-matches: ["*.ts"]
-module_suffix: ".ts"
-package_index: "index"       # dir/ is a module via dir/index.ts
+# TSX recipe — typescript.yml plus JSX. A separate file because tree-sitter
+# ships tsx as its own grammar, so every query has to be compiled against it;
+# keep the two in step when either changes.
+name: tsx
+version: "1"
+language: tsx
+matches: ["*.tsx"]
+module_suffix: ".tsx"
+package_index: "index"       # dir/ is a module via dir/index.tsx
 self_name: "this"            # `this.x` means the enclosing class's x
 
 docs:
@@ -112,4 +112,13 @@ references:
   - kind: types
     query: "(type_arguments (type_identifier) @target)"
     only: [interface, class, type, enum]
+    unresolved: drop
+  # <Widget /> renders a component — the JSX spelling of calling it
+  - kind: calls
+    query: "(jsx_opening_element name: [(identifier) (member_expression)] @target)"
+    only: [function, class]
+    unresolved: drop
+  - kind: calls
+    query: "(jsx_self_closing_element name: [(identifier) (member_expression)] @target)"
+    only: [function, class]
     unresolved: drop

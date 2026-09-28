@@ -38,11 +38,17 @@ class EntityRule:
 class BindingRule:
     query: str
     style: str = "module"            # "module": dotted name maps to a path; "path": text is a relative path
+    star: bool = False               # binds every exported name of the module
+                                     # (`from m import *`, `export * from "./m"`)
 
 
 @dataclass(frozen=True)
 class DocRule:
-    query: str                       # @doc capture; attaches to the innermost enclosing entity
+    query: str                       # @doc capture
+    attach: str = "enclosed"         # "enclosed": innermost entity around it (docstrings);
+                                     # "preceding": the entity it sits directly above (comments, JSDoc)
+    kind: str = "docstring"          # provenance label, stored as the entity's doc_kind
+    scope: bool = False              # True: may also describe <module> (file-header comments)
 
 
 @dataclass(frozen=True)
@@ -52,6 +58,9 @@ class ReferenceRule:
     resolve: str = "lexical"
     only: tuple[str, ...] = ()       # resolved target must be one of these entity kinds
     unresolved: str = "external"     # "external" keeps the name as written; "drop" discards
+    attach: str = "enclosed"         # "enclosed": the entity the reference sits inside;
+                                     # "following": the entity it sits directly above
+                                     # (a decorator is written before what it decorates)
 
 
 @dataclass(frozen=True)
@@ -61,6 +70,8 @@ class Recipe:
     language: str                    # tree-sitter grammar key
     matches: tuple[str, ...]         # file globs
     module_suffix: str = ""          # "billing" -> "billing" + suffix for module targets
+    package_index: str = ""          # a dir is a module via this file: __init__ (py), index (ts)
+    self_name: str = ""              # the instance prefix: "self" (py), "this" (ts)
     entities: tuple[EntityRule, ...] = ()
     bindings: tuple[BindingRule, ...] = ()
     references: tuple[ReferenceRule, ...] = ()
@@ -110,12 +121,15 @@ def load_recipe(path: Path) -> Recipe:
         language=str(data["language"]),
         matches=tuple(data["matches"]),
         module_suffix=str(data.get("module_suffix", "")),
+        package_index=str(data.get("package_index", "")),
+        self_name=str(data.get("self_name", "")),
         entities=tuple(
             EntityRule(kind=e["kind"], query=e["query"])
             for e in data.get("entities") or ()
         ),
         bindings=tuple(
-            BindingRule(query=b["query"], style=b.get("style", "module"))
+            BindingRule(query=b["query"], style=b.get("style", "module"),
+                        star=bool(b.get("star", False)))
             for b in data.get("bindings") or ()
         ),
         references=tuple(
@@ -125,11 +139,30 @@ def load_recipe(path: Path) -> Recipe:
                 resolve=r.get("resolve", "lexical"),
                 only=tuple(r.get("only") or ()),
                 unresolved=r.get("unresolved", "external"),
+                attach=r.get("attach", "enclosed"),
             )
             for r in data.get("references") or ()
         ),
-        docs=tuple(DocRule(query=d["query"]) for d in data.get("docs") or ()),
+        docs=tuple(
+            DocRule(
+                query=d["query"],
+                attach=d.get("attach", "enclosed"),
+                kind=d.get("kind", "docstring"),
+                scope=bool(d.get("scope", False)),
+            )
+            for d in data.get("docs") or ()
+        ),
     )
+
+    for rule in recipe.docs:
+        if rule.attach not in ("enclosed", "preceding"):
+            raise RecipeError(f"{path}: docs.attach must be 'enclosed' or 'preceding', "
+                              f"got {rule.attach!r}")
+
+    for rule in recipe.references:
+        if rule.attach not in ("enclosed", "following"):
+            raise RecipeError(f"{path}: references.attach must be 'enclosed' or "
+                              f"'following', got {rule.attach!r}")
 
     for rule in (*recipe.entities, *recipe.bindings, *recipe.references, *recipe.docs):
         try:

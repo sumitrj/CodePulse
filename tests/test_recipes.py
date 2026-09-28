@@ -166,6 +166,44 @@ def test_mixed_internal_and_external_targets_do_not_break_reads(build):
     assert dsts == {Addr("billing.py", "total"), External("json.loads")}
 
 
+# === AC5 addendum 2 (found dogfooding): packages, dotted submodules, re-exports ===
+
+def test_from_package_import_resolves_through_init(build):
+    engine, _ = build({
+        "pkg/__init__.py": "",
+        "pkg/defs.py": "def alpha():\n    return 1\n",
+        "user.py": "from pkg import defs\n\ndef use():\n    return defs.alpha()\n",
+    })
+
+    edge = single(engine.outgoing(Addr("user.py", "use"), kind="calls"))
+
+    assert edge.dst == Addr("pkg/defs.py", "alpha")
+
+
+def test_dotted_submodule_call_resolves(build):
+    engine, _ = build({
+        "pkg/__init__.py": "",
+        "pkg/defs.py": "def alpha():\n    return 1\n",
+        "user.py": "import pkg.defs\n\ndef use():\n    return pkg.defs.alpha()\n",
+    })
+
+    edge = single(engine.outgoing(Addr("user.py", "use"), kind="calls"))
+
+    assert edge.dst == Addr("pkg/defs.py", "alpha")
+
+
+def test_reexport_through_package_init_reaches_the_definition(build):
+    engine, _ = build({
+        "pkg/__init__.py": "from pkg.defs import alpha\n",
+        "pkg/defs.py": "def alpha():\n    return 1\n",
+        "user.py": "from pkg import alpha\n\ndef use():\n    return alpha()\n",
+    })
+
+    edge = single(engine.outgoing(Addr("user.py", "use"), kind="calls"))
+
+    assert edge.dst == Addr("pkg/defs.py", "alpha")
+
+
 # === AC6: self.method() resolves to Class.method; instantiation calls the class ===
 
 def test_self_method_call_resolves_to_class_method(build):

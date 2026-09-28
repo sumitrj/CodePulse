@@ -1,0 +1,13 @@
+Red baseline — 2026-07-21, `uv run --with pytest python -m pytest tests/test_delta.py -v`
+
+ERROR collecting tests/test_delta.py
+ImportError: cannot import name 'delta' from 'codepulse'
+(raised at tests/test_delta.py:14 — from codepulse import delta)
+
+Expected state: the module does not exist yet. 14 test cases (12 acceptance
+criteria; AC2 x3 parametrized) are red via collection error. Phase 3 flips
+every one green.
+
+Contract: when implementation lands, the full suite passes with no test
+modified. Any test change during implementation is a spec change and must go
+through specs/delta/SPEC.md first.

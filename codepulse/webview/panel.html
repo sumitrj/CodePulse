@@ -697,6 +697,8 @@
   async function run(v, arg) {
     setActive(v);
     $("#arg").value = arg;
+    // every view is a link: #radius/infra.tf::DB_URL — share it, bookmark it
+    history.replaceState(null, "", `#${v}${arg ? "/" + encodeURIComponent(arg) : ""}`);
     if (v === "what" && arg) {
       await drawCard(arg);
       return;
@@ -777,7 +779,10 @@
   window.addEventListener("focus", loadTree);
 
   applySettings();
-  loadTree().then(() => run("map", ""));
+  const [linkVerb, ...linkArg] = location.hash.slice(1).split("/");
+  const linked = ["what", "who", "radius", "changed", "locate", "map", "handlers"].includes(linkVerb);
+  loadTree().then(() => linked ? run(linkVerb, decodeURIComponent(linkArg.join("/")))
+                               : run("map", ""));
 </script>
 </body>
 </html>

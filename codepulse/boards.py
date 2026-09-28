@@ -8,7 +8,7 @@ See specs/boards/SPEC.md.
 from collections import Counter, deque
 
 from . import six
-from .engine import Addr, Engine
+from .engine import MODULE_SCOPE, SCOPES, Addr, Engine
 
 _IMPACT = ("calls", "reads", "inherits")
 
@@ -114,6 +114,7 @@ def card(engine: Engine, name: str) -> dict | None:
     return {
         "entity": {"path": addr.path, "name": addr.name, "kind": entity.kind,
                    "line": entity.line, "meta": entity.meta, "doc": entity.doc,
+                   "doc_kind": entity.doc_kind,
                    "recipe": entity.recipe, "recipe_version": entity.recipe_version},
         "incoming": incoming,
         "outgoing": outgoing,
@@ -156,7 +157,7 @@ def radius_graph(engine: Engine, name: str, direction: str = "in") -> dict:
 
 def file_graph(engine: Engine) -> dict:
     entities = engine.entities()
-    files = sorted({e.addr.path for e in entities})
+    files = sorted({e.addr.path for e in entities if e.addr.name == MODULE_SCOPE})
     mode = "file" if len(files) <= 150 else "dir"
 
     def gid(path: str) -> str:
@@ -166,7 +167,7 @@ def file_graph(engine: Engine) -> dict:
 
     counts: Counter = Counter()
     for e in entities:
-        if e.addr.name != "<module>":
+        if e.addr.name not in SCOPES:
             counts[gid(e.addr.path)] += 1
 
     agg: Counter = Counter()
